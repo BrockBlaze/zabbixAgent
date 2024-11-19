@@ -20,22 +20,23 @@ yes | sudo sensors-detect
 # Create CPU temperature script
 echo "Creating CPU temperature script..."
 sudo mkdir -p /etc/zabbix/scripts
-sudo bash -c 'cat << EOF > /etc/zabbix/scripts/cpu_temp.sh
+cat << 'EOF' | sudo tee /etc/zabbix/scripts/cpu_temp.sh
 #!/bin/bash
 
 # Get CPU temperature using lm-sensors
 sensors_output=$(sensors)
 
-# Extract the CPU temperature (modify the grep pattern to match your system output)
-cpu_temp=$(echo "$sensors_output" | grep -i "Sensor 1:" | awk "{print $3}" | tr -d "+°C")
+# Extract the CPU temperature for "Core 0" (adjust the grep pattern as needed for your system)
+cpu_temp=$(echo "$sensors_output" | grep -i 'Sensor 1' | awk '{print $3}' | tr -d '+°C')
 
-# Print the CPU temperature or default to 0 if not found
+# If the temperature is not found, provide a default value
 if [[ -n "$cpu_temp" ]]; then
     echo "$cpu_temp"
 else
-    echo "0"
+    echo "Temperature not found. Ensure lm-sensors is installed and sensors-detect has been run."
+    exit 1
 fi
-EOF'
+EOF
 
 sudo chmod +x /etc/zabbix/scripts/cpu_temp.sh
 
