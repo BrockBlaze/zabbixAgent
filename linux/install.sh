@@ -22,8 +22,20 @@ echo "Creating CPU temperature script..."
 sudo mkdir -p /etc/zabbix/scripts
 sudo bash -c 'cat << EOF > /etc/zabbix/scripts/cpu_temp.sh
 #!/bin/bash
-sensors | grep -m 1 "Sensor 1:" | awk "{print \$3}" | tr -d "+°C"
-EOF'
+
+# Get CPU temperature using lm-sensors
+sensors_output=$(sensors)
+
+# Extract the CPU temperature (modify the grep pattern to match your system's output)
+cpu_temp=$(echo "$sensors_output" | grep -i 'Sensor 1:' | awk '{print $3}' | tr -d '+°C')
+
+# Print the CPU temperature or default to 0 if not found
+if [[ -n "$cpu_temp" ]]; then
+    echo "$cpu_temp"
+else
+    echo "0"
+fi
+EOF
 
 sudo chmod +x /etc/zabbix/scripts/cpu_temp.sh
 
