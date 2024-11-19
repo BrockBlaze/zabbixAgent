@@ -22,7 +22,7 @@ echo "Creating CPU temperature script..."
 sudo mkdir -p /etc/zabbix/scripts
 sudo bash -c 'cat << EOF > /etc/zabbix/scripts/cpu_temp.sh
 #!/bin/bash
-sensors | grep -m 1 "Core 0:" | awk "{print \$3}" | tr -d "+°C"
+sensors | grep -m 1 "Sensor 1:" | awk "{print \$3}" | tr -d "+°C"
 EOF'
 
 sudo chmod +x /etc/zabbix/scripts/cpu_temp.sh
