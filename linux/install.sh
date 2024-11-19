@@ -16,8 +16,8 @@ cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup
 echo "Configuring Zabbix agent..."
 
 # Replace placeholders with actual values
-sed -i "s/^Server=127.0.0.1/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf
-sed -i "s/^Hostname=ZABBIX_SERVER/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
+sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf
+sed -i "s/^#Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
 
 # Restart the Zabbix agent service to apply the changes
 sudo systemctl restart zabbix-agent
