@@ -26,8 +26,8 @@ sudo bash -c 'cat << EOF > /etc/zabbix/scripts/cpu_temp.sh
 # Get CPU temperature using lm-sensors
 sensors_output=$(sensors)
 
-# Extract the CPU temperature (modify the grep pattern to match your system's output)
-cpu_temp=$(echo "$sensors_output" | grep -i 'Sensor 1:' | awk '{print $3}' | tr -d '+°C')
+# Extract the CPU temperature (modify the grep pattern to match your system output)
+cpu_temp=$(echo "$sensors_output" | grep -i "Sensor 1:" | awk "{print $3}" | tr -d "+°C")
 
 # Print the CPU temperature or default to 0 if not found
 if [[ -n "$cpu_temp" ]]; then
@@ -35,9 +35,27 @@ if [[ -n "$cpu_temp" ]]; then
 else
     echo "0"
 fi
-EOF
+EOF'
 
 sudo chmod +x /etc/zabbix/scripts/cpu_temp.sh
+
+# Create Login monitoring script
+echo "Creating Login monitoring script..."
+sudo mkdir -p /etc/zabbix/scripts
+sudo bash -c 'cat << EOF > /etc/zabbix/scripts/login_monitoring.sh
+#!/bin/bash
+
+# Get login attempts using last command
+
+last -n 10
+
+# Get failed login attempts using last command
+
+lastb -n 10 
+
+EOF'
+
+sudo chmod +x /etc/zabbix/scripts/login_monitoring.sh
 
 # Backup the original configuration file (in case something goes wrong)
 cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup
@@ -52,6 +70,11 @@ sed -i "s/^#Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
 # Add custom UserParameter for Zabbix agent
 if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; then
   echo "UserParameter=cpu.temperature,/etc/zabbix/scripts/cpu_temp.sh" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
+# Add custom UserParameter for Zabbix agent
+if ! grep -q "UserParameter=login.attempts" /etc/zabbix/zabbix_agentd.conf; then
+  echo "UserParameter=login.attempts,/etc/zabbix/scripts/login_monitoring.sh" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # Restart the Zabbix agent service to apply the changes

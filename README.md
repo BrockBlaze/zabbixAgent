@@ -20,5 +20,5 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/rithm-zabbix-installer.git
-   cd rithm-zabbix-installer
+   git clone https://github.com/BrockBlaze/zabbixAgent.git
+   cd zabbixAgent
