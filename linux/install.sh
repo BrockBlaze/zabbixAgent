@@ -45,15 +45,8 @@ echo "Creating Login monitoring script..."
 sudo mkdir -p /etc/zabbix/scripts
 sudo bash -c 'cat << EOF > /etc/zabbix/scripts/login_monitoring.sh
 #!/bin/bash
-
 # Get login attempts using last command
-
 last -n 10
-
-# Get failed login attempts using last command
-
-lastb -n 10 
-
 EOF'
 
 sudo chmod +x /etc/zabbix/scripts/login_monitoring.sh
