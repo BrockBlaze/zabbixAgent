@@ -1,4 +1,4 @@
-# Rithm Zabbix Installer
+# Rithm Zabbix Agent Installer
 
 This repository provides an automated installer for setting up the Zabbix Agent on Linux and Windows servers, pre-configured for monitoring system hardware, logins, and logs.
 
@@ -22,3 +22,8 @@ This repository provides an automated installer for setting up the Zabbix Agent 
    ```bash
    git clone https://github.com/BrockBlaze/zabbixAgent.git
    cd zabbixAgent
+   sudo chmod +x /linux/install.sh
+   sudo ./linux/install.sh
+
+
+### Windows
