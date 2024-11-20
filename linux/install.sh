@@ -77,6 +77,6 @@ sudo systemctl restart zabbix-agent
 # Enable the Zabbix agent service to start on boot
 sudo systemctl enable zabbix-agent
 
-cd ~
-
 echo "Zabbix Agent installed and configured!"
+
+cd ~
