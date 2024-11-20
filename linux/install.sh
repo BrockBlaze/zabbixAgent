@@ -78,5 +78,3 @@ sudo systemctl restart zabbix-agent
 sudo systemctl enable zabbix-agent
 
 echo "Zabbix Agent installed and configured!"
-
-cd ~
