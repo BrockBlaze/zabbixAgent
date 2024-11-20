@@ -22,7 +22,7 @@ This repository provides an automated installer for setting up the Zabbix Agent 
    ```bash
    git clone https://github.com/BrockBlaze/zabbixAgent.git
    cd zabbixAgent
-   sudo chmod +x /linux/install.sh
+   sudo chmod +x linux/install.sh
    sudo ./linux/install.sh
 
 
