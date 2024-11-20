@@ -24,6 +24,4 @@ This repository provides an automated installer for setting up the Zabbix Agent 
    cd zabbixAgent
    sudo chmod +x linux/install.sh
    sudo ./linux/install.sh
-
-
 ### Windows
