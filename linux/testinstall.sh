@@ -4,7 +4,7 @@
 REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
 Source_Dir="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/scripts"
-SCRIPTS_DIR="/etc/zabbix/scripts"
+SCRIPTS_DIR="/etc/zabbix/"
 
 # Ask for the Zabbix server IP and hostname
 read -p "Enter Zabbix Server IP: " ZABBIX_SERVER_IP
