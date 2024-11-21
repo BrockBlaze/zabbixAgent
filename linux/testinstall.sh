@@ -28,7 +28,7 @@ sudo mkdir -p "$SCRIPTS_DIR" || { echo "Failed to create the target directory.";
 
 # Moving scripts to the target directory
 echo "Moving scripts to the target directory..."
-sudo cp -r "$TARGET_DIR"/* "$SCRIPTS_DIR/" || { echo "Failed to move scripts."; exit 1; }
+sudo cp -r "$TARGET_DIR" "$SCRIPTS_DIR" || { echo "Failed to move scripts."; exit 1; }
 
 # Setting permissions
 echo "Setting permissions..."
