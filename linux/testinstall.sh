@@ -2,7 +2,7 @@
 
 # Setting Variables
 REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
-TARGET_DIR="zabbixAgent/linux/scripts"
+TARGET_DIR="/zabbixAgent"
 SCRIPTS_DIR="/etc/zabbix/scripts"
 
 # Cloning the repository
