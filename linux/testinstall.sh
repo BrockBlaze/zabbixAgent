@@ -37,7 +37,7 @@ sudo cp -r "$TARGET_DIR" "$SCRIPTS_DIR" || { echo "Failed to move scripts."; exi
 
 # Setting permissions
 echo "Setting permissions..."
-sudo chmod +x "$SCRIPTS_DIR"/*.sh || { echo "Failed to set permissions."; exit 1; }
+sudo chmod +x "$SCRIPTS_DIR"/scripts/*.sh || { echo "Failed to set permissions."; exit 1; }
 
 
 # Backup the original configuration file (in case something goes wrong)
