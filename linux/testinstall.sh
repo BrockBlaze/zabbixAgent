@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Setting Variables
+REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
 Source_Dir="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/scripts"
 SCRIPTS_DIR="/etc/zabbix/scripts"
@@ -21,6 +22,10 @@ sudo apt install -y lm-sensors
 echo "Automatically Detecting Sensors..."
 # Configure sensors (automatic detection)
 yes | sudo sensors-detect
+
+# Clone the repository
+echo "Cloning repository..."
+git clone "$REPO_URL" "$Source_Dir" || { echo "Failed to clone repository"; exit 1; }
 
 # Ensuring the target directory exists
 echo "Ensuring the target directory exists..."
