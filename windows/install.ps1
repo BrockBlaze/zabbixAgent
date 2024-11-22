@@ -28,10 +28,6 @@ if (Test-Path $downloadDir) {
     Remove-Item -Recurse -Force $downloadDir
 }
 
-Write-Host "Cloning repository..."
-git clone $repoUrl $downloadDir
-
-
 # Step 2: Clone repository
 Write-Host "Cloning repository..."
 git clone $repoUrl $downloadDir
@@ -56,7 +52,7 @@ Restart-Service -Name "Zabbix Agent"
 Set-Service -Name "Zabbix Agent" -StartupType Automatic
 
 # Cleanup
-Write-Host "Cleaning up temporary files..."
-Remove-Item -Recurse -Force $downloadDir
+# Write-Host "Cleaning up temporary files..."
+# Remove-Item -Recurse -Force $downloadDir
 
 Write-Host "Zabbix Agent installed and configured successfully!"
