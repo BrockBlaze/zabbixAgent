@@ -2,7 +2,7 @@
 
 # Setting Variables
 REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
-USERNAME=$(whoami)
+USERNAME=$(logname)
 START_DIR="/home/$USERNAME/zabbixAgent"
 SOURCE_DIR="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/scripts"
