@@ -75,6 +75,4 @@ echo "Cleaning up..."
 sudo rm -rf "$SOURCE_DIR"
 sudo rm -rf "$START_DIR"
 
-echo $USERNAME
-
 echo "Installation completed successfully!"
