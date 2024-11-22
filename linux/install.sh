@@ -2,7 +2,8 @@
 
 # Setting Variables
 REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
-START_DIR="/home/$USER/zabbixAgent"
+$NAME="whoami"
+START_DIR="/home/$NAME/zabbixAgent"
 SOURCE_DIR="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/scripts"
 SCRIPTS_DIR="/etc/zabbix/"
@@ -74,6 +75,6 @@ echo "Cleaning up..."
 sudo rm -rf "$SOURCE_DIR"
 sudo rm -rf "$START_DIR"
 
-echo "$USER"
+echo whoami
 
 echo "Installation completed successfully!"
