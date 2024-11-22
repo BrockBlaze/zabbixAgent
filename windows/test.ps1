@@ -1,5 +1,5 @@
 # Set variables
-$installerUrl = "https://cdn.zabbix.com/zabbix/binaries/stable/6.0/6.0.20/zabbix_agent-6.0.20-x86_64.msi"
+$installerUrl = "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.6/zabbix_agent-7.0.6-windows-amd64-openssl.msi"
 $tempDir = "C:\Temp\zabbixAgent"
 $installerPath = "$tempDir\zabbix_agent.msi"
 
