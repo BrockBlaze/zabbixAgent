@@ -30,6 +30,6 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 1. Run this in PowerShell:
    ```powershell
-   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/BrockBlaze/zabbixAgent/windows/install.ps1" -OutFile "install.ps1"
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/BrockBlaze/zabbixAgent/main/windows/install.ps1" -OutFile "install.ps1"
    powershell -ExecutionPolicy Bypass -File install.ps1
    ```
