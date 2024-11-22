@@ -23,6 +23,15 @@ Invoke-WebRequest -Uri "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.6/
 Write-Host "Installing Zabbix Agent..."
 Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $downloadDir\zabbix_agent.msi /quiet" -Wait
 
+if (Test-Path $downloadDir) {
+    Write-Host "Cleaning up existing directory: $downloadDir"
+    Remove-Item -Recurse -Force $downloadDir
+}
+
+Write-Host "Cloning repository..."
+git clone $repoUrl $downloadDir
+
+
 # Step 2: Clone repository
 Write-Host "Cloning repository..."
 git clone $repoUrl $downloadDir
