@@ -10,7 +10,7 @@ $hostname = Read-Host "Enter the Hostname (this server's name)"
 
 # Step 1: Download and install Zabbix Agent
 Write-Host "Downloading Zabbix Agent installer..."
-Invoke-WebRequest -Uri "https://cdn.zabbix.com/zabbix/binaries/stable/6.0/6.0.19/zabbix_agent-6.0.19-windows-amd64-openssl.msi" -OutFile "$downloadDir\zabbix_agent.msi"
+Invoke-WebRequest -Uri "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.6/zabbix_agent-7.0.6-windows-amd64-openssl.msi" -OutFile "$downloadDir\zabbix_agent.msi"
 
 Write-Host "Installing Zabbix Agent..."
 Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $downloadDir\zabbix_agent.msi /quiet" -Wait
