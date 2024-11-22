@@ -1,33 +1,4 @@
-# Check if Git is installed
-$gitPath = Get-Command git -ErrorAction SilentlyContinue
-
-if (-not $gitPath) {
-    Write-Host "Git is not installed. Installing Git..."
-
-    # Download Git installer
-    $gitInstallerUrl = "https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/Git-2.47.0.2-64-bit.exe"
-    $installerPath = "$env:TEMP\Git-2.47.0.2-64-bit.exe"
-    
-    # Download the installer
-    Invoke-WebRequest -Uri $gitInstallerUrl -OutFile $installerPath
-
-    # Run the installer
-    Start-Process -FilePath $installerPath -ArgumentList "/silent" -Wait
-
-    # Verify installation
-    $gitPath = Get-Command git -ErrorAction SilentlyContinue
-    if ($gitPath) {
-        Write-Host "Git installed successfully."
-    }
-    else {
-        Write-Host "Git installation failed. Please install Git manually."
-        exit
-    }
-}
-else {
-    Write-Host "Git is already installed."
-}
-
+# Install Zabbix Agent
 # Variables
 $repoUrl = "https://github.com/BrockBlaze/zabbixAgent"
 $downloadDir = "C:\Temp\zabbixAgent"
