@@ -6,7 +6,7 @@ if (-not $gitPath) {
 
     # Download Git installer
     $gitInstallerUrl = "https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/Git-2.47.0.2-64-bit.exe"
-    $installerPath = "$env:TEMP\Git-installer.exe"
+    $installerPath = "$env:TEMP\Git-2.47.0.2-64-bit.exe"
     
     # Download the installer
     Invoke-WebRequest -Uri $gitInstallerUrl -OutFile $installerPath
