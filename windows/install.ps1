@@ -5,7 +5,7 @@ if (-not $gitPath) {
     Write-Host "Git is not installed. Installing Git..."
 
     # Download Git installer
-    $gitInstallerUrl = "https://git-scm.com/download/win"
+    $gitInstallerUrl = "https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/Git-2.47.0.2-64-bit.exe"
     $installerPath = "$env:TEMP\Git-installer.exe"
     
     # Download the installer
