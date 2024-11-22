@@ -4,6 +4,12 @@ $downloadDir = "C:\Temp\zabbixAgent"
 $scriptsDir = "C:\Program Files\Zabbix Agent\scripts"
 $configFile = "C:\Program Files\Zabbix Agent\zabbix_agentd.conf"
 
+# Ensure the download directory exists
+if (-not (Test-Path $downloadDir)) {
+    Write-Host "Creating directory $downloadDir"
+    New-Item -ItemType Directory -Force -Path $downloadDir
+}
+
 # Prompt for Zabbix server IP and hostname
 $zabbixServerIP = Read-Host "Enter the Zabbix Server IP"
 $hostname = Read-Host "Enter the Hostname (this server's name)"
