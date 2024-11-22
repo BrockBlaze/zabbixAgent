@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Setting Variables
+REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
+START_DIR="/home/rithm/zabbixAgent"
+SOURCE_DIR="/zabbixAgent"
+TARGET_DIR="/zabbixAgent/linux/scripts"
+SCRIPTS_DIR="/etc/zabbix/"
+
 # Ask for the Zabbix server IP and hostname
 read -p "Enter Zabbix Server IP: " ZABBIX_SERVER_IP
 read -p "Enter Hostname (this server's name): " HOSTNAME
@@ -17,39 +24,22 @@ echo "Automatically Detecting Sensors..."
 # Configure sensors (automatic detection)
 yes | sudo sensors-detect
 
-# Create CPU temperature script
-echo "Creating CPU temperature script..."
-sudo mkdir -p /etc/zabbix/scripts
-cat << 'EOF' | sudo tee /etc/zabbix/scripts/cpu_temp.sh
-#!/bin/bash
+# Clone the repository
+echo "Cloning repository..."
+git clone "$REPO_URL" "$SOURCE_DIR" || { echo "Failed to clone repository"; exit 1; }
 
-# Get CPU temperature using lm-sensors
-sensors_output=$(sensors)
+# Ensuring the target directory exists
+echo "Ensuring the target directory exists..."
+sudo mkdir -p "$SCRIPTS_DIR" || { echo "Failed to create the target directory."; exit 1; }
 
-# Extract the CPU temperature for "Core 0" (adjust the grep pattern as needed for your system)
-cpu_temp=$(echo "$sensors_output" | grep -i 'Sensor 1' | awk '{print $3}' | tr -d '+°C')
+# Moving scripts to the target directory
+echo "Moving scripts to the target directory..."
+sudo cp -r "$TARGET_DIR" "$SCRIPTS_DIR" || { echo "Failed to move scripts."; exit 1; }
 
-# If the temperature is not found, provide a default value
-if [[ -n "$cpu_temp" ]]; then
-    echo "$cpu_temp"
-else
-    echo "Temperature not found. Ensure lm-sensors is installed and sensors-detect has been run."
-    exit 1
-fi
-EOF
+# Setting permissions
+echo "Setting permissions..."
+sudo chmod +x "$SCRIPTS_DIR"/scripts/*.sh || { echo "Failed to set permissions."; exit 1; }
 
-sudo chmod +x /etc/zabbix/scripts/cpu_temp.sh
-
-# Create Login monitoring script
-echo "Creating Login monitoring script..."
-sudo mkdir -p /etc/zabbix/scripts
-sudo bash -c 'cat << EOF > /etc/zabbix/scripts/login_monitoring.sh
-#!/bin/bash
-# Get login attempts using last command
-last -n 10
-EOF'
-
-sudo chmod +x /etc/zabbix/scripts/login_monitoring.sh
 
 # Backup the original configuration file (in case something goes wrong)
 cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup
@@ -78,3 +68,13 @@ sudo systemctl restart zabbix-agent
 sudo systemctl enable zabbix-agent
 
 echo "Zabbix Agent installed and configured!"
+
+# Clean up
+echo "Cleaning up..."
+sudo rm -rf "$SOURCE_DIR"
+sudo rm -rf "$START_DIR"
+
+echo "Returning to root directory..."
+cd /
+
+echo "Installation completed successfully!"
