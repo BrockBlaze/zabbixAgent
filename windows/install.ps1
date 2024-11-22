@@ -5,6 +5,7 @@ $scriptsDir = "C:\Program Files\Zabbix Agent\scripts"
 $configFile = "C:\Program Files\Zabbix Agent\zabbix_agentd.conf"
 
 # Ensure the download directory exists
+Write-Host "Testing directory $downloadDir"
 if (-not (Test-Path $downloadDir)) {
     Write-Host "Creating directory $downloadDir"
     New-Item -ItemType Directory -Force -Path $downloadDir
