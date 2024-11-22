@@ -27,5 +27,4 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 ### Windows
 
-1. Run the install.bat file:
-   ```bash
+1. Run the install.bat file
