@@ -18,7 +18,7 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 ### Linux
 
-1. Clone the repository:
+1. Run this in the terminal:
    ```bash
    git clone https://github.com/BrockBlaze/zabbixAgent.git
    cd zabbixAgent
@@ -30,6 +30,6 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 1. Run this in PowerShell:
    ```powershell
-   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/YourUsername/zabbixAgentCustom/main/install_zabbix_agent.ps1" -OutFile "install_zabbix_agent.ps1"
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/BrockBlaze/zabbixAgent/windows/install.ps1" -OutFile "install.ps1"
    powershell -ExecutionPolicy Bypass -File install_zabbix_agent.ps1
    ```
