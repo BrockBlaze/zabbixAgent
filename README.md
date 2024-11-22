@@ -28,7 +28,9 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 ### Windows
 
-1. Run this in PowerShell:
+1. Download and install [Git](https://git-scm.com/download/win).
+
+2. Run this in PowerShell:
    ```powershell
    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/BrockBlaze/zabbixAgent/main/windows/install.ps1" -OutFile "install.ps1"
    powershell -ExecutionPolicy Bypass -File install.ps1
