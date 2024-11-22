@@ -21,7 +21,7 @@ Write-Host "Downloading Zabbix Agent installer..."
 Invoke-WebRequest -Uri "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.6/zabbix_agent-7.0.6-windows-amd64-openssl.msi" -OutFile "$downloadDir\zabbix_agent.msi"
 
 Write-Host "Installing Zabbix Agent..."
-Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $downloadDir\zabbix_agent.msi /quiet" -Wait
+Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $downloadDir\windows\zabbix_agent.msi /quiet" -Wait
 
 if (Test-Path $downloadDir) {
     Write-Host "Cleaning up existing directory: $downloadDir"
