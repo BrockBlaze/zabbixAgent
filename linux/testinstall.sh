@@ -2,7 +2,8 @@
 
 # Setting Variables
 REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
-Source_Dir="/zabbixAgent"
+START_DIR="/home/rithm/zabbixAgent"
+SOURCE_DIR="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/scripts"
 SCRIPTS_DIR="/etc/zabbix/"
 
@@ -25,7 +26,7 @@ yes | sudo sensors-detect
 
 # Clone the repository
 echo "Cloning repository..."
-git clone "$REPO_URL" "$Source_Dir" || { echo "Failed to clone repository"; exit 1; }
+git clone "$REPO_URL" "$SOURCE_DIR" || { echo "Failed to clone repository"; exit 1; }
 
 # Ensuring the target directory exists
 echo "Ensuring the target directory exists..."
@@ -67,5 +68,12 @@ sudo systemctl restart zabbix-agent
 sudo systemctl enable zabbix-agent
 
 echo "Zabbix Agent installed and configured!"
+
+# Clean up
+echo "Cleaning up..."
+sudo rm -rf "$SOURCE_DIR"
+sudo rm -rf "$START_DIR"
+
+cd ~
 
 echo "Installation completed successfully!"
