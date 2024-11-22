@@ -74,7 +74,4 @@ echo "Cleaning up..."
 sudo rm -rf "$SOURCE_DIR"
 sudo rm -rf "$START_DIR"
 
-echo "Returning to root directory..."
-cd /
-
 echo "Installation completed successfully!"
