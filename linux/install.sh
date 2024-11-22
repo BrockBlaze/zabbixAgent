@@ -2,7 +2,7 @@
 
 # Setting Variables
 REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
-START_DIR="/home/rithm/zabbixAgent"
+START_DIR="/home/$USER/zabbixAgent"
 SOURCE_DIR="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/scripts"
 SCRIPTS_DIR="/etc/zabbix/"
