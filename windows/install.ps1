@@ -25,7 +25,7 @@ Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $downloadDir\zabbix_agen
 
 if (Test-Path $downloadDir) {
     Write-Host "Cleaning up existing directory: $downloadDir"
-    Remove-Item -Recurse -Force $downloadDir
+    # Remove-Item -Recurse -Force $downloadDir
 }
 
 # Step 2: Clone repository
