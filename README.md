@@ -24,7 +24,12 @@ This repository provides an automated installer for setting up the Zabbix Agent 
    cd zabbixAgent
    sudo chmod +x linux/install.sh
    sudo ./linux/install.sh
+   ```
 
 ### Windows
 
-1. Run the install.bat file
+1. Run this in PowerShell:
+   ```powershell
+   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/YourUsername/zabbixAgentCustom/main/install_zabbix_agent.ps1" -OutFile "install_zabbix_agent.ps1"
+   powershell -ExecutionPolicy Bypass -File install_zabbix_agent.ps1
+   ```
