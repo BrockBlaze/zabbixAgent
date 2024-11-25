@@ -1,5 +1,6 @@
 # Set Variables
 $repoUrl = "https://github.com/BrockBlaze/zabbixAgent/archive/refs/heads/main.zip"
+$tempDir = "C:\Temp"
 $downloadDir = "C:\Temp\zabbixAgent"
 $installDir = "C:\Program Files\Zabbix Agent"
 $scriptsDir = "$installDir\scripts"
@@ -37,6 +38,6 @@ Restart-Service -Name "Zabbix Agent"
 Set-Service -Name "Zabbix Agent" -StartupType Automatic
 
 # Clean up
-# Write-Host "Cleaning up..."
-# Remove-Item -Path $zipPath -Force
-# Write-Host "Installation completed successfully!"
+Write-Host "Cleaning up..."
+Remove-Item -Path $tempDir -Force
+Write-Host "Installation completed successfully!"
