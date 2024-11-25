@@ -31,9 +31,9 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 1. Download and install [Git](https://git-scm.com/download/win).
 
 2. Download and install [OpenHardwareMonitor](https://openhardwaremonitor.org/downloads/).
-   a. Unzip files to C:\Tools\OpenHardwareMonitor\
-   b. Run OpenHardwareMonitor.exe
-   c. Go to Options Tab of OpenHardwareMonitor and Check Start Minimized, Minimize To Tray, Minimize On Close, and Run On Windows Startup. Make sure to Check Remote Web Server, Run.
+   **a.** Unzip files to C:\Tools\OpenHardwareMonitor\
+   **b.** Run OpenHardwareMonitor.exe
+   **c.** Go to Options Tab of OpenHardwareMonitor and Check Start Minimized, Minimize To Tray, Minimize On Close, and Run On Windows Startup. Make sure to Check Remote Web Server, Run.
 
 2. Run this in PowerShell as administrator:
    ```powershell
