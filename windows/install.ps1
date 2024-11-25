@@ -37,6 +37,6 @@ Restart-Service -Name "Zabbix Agent"
 Set-Service -Name "Zabbix Agent" -StartupType Automatic
 
 # Clean up
-Write-Host "Cleaning up..."
-Remove-Item -Path $zipPath -Force
-Write-Host "Installation completed successfully!"
+# Write-Host "Cleaning up..."
+# Remove-Item -Path $zipPath -Force
+# Write-Host "Installation completed successfully!"
