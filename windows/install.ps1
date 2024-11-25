@@ -1,58 +1,42 @@
-# Install Zabbix Agent
-# Variables
-$repoUrl = "https://github.com/BrockBlaze/zabbixAgent"
+# Set Variables
+$repoUrl = "https://github.com/BrockBlaze/zabbixAgnet/archive/refs/heads/main.zip"
 $downloadDir = "C:\Temp\zabbixAgent"
-$scriptsDir = "C:\Program Files\Zabbix Agent\scripts"
-$configFile = "C:\Program Files\Zabbix Agent\zabbix_agentd.conf"
+$installDir = "C:\Program Files\Zabbix Agent"
+$scriptsDir = "$installDir\scripts"
 
-# Ensure the download directory exists
-Write-Host "Testing directory $downloadDir"
-if (-not (Test-Path $downloadDir)) {
-    Write-Host "Creating directory $downloadDir"
-    New-Item -ItemType Directory -Force -Path $downloadDir
+# Ensure required folders exist
+if (-Not (Test-Path -Path $downloadDir)) {
+    New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
 }
 
-# Prompt for Zabbix server IP and hostname
-$zabbixServerIP = Read-Host "Enter the Zabbix Server IP"
-$hostname = Read-Host "Enter the Hostname (this server's name)"
+# Download and Extract Repository
+Write-Host "Downloading repository..."
+$zipPath = "$downloadDir\zabbixAgent.zip"
+Invoke-WebRequest -Uri $repoUrl -OutFile $zipPath
 
-# Step 1: Download and install Zabbix Agent
-Write-Host "Downloading Zabbix Agent installer..."
-Invoke-WebRequest -Uri "https://cdn.zabbix.com/zabbix/binaries/stable/7.0/7.0.6/zabbix_agent-7.0.6-windows-amd64-openssl.msi" -OutFile "$downloadDir\zabbix_agent.msi"
+Write-Host "Extracting repository..."
+Expand-Archive -Path $zipPath -DestinationPath $downloadDir -Force
 
+# Copy configuration and scripts
+Write-Host "Copying configuration and scripts..."
+Copy-Item -Path "$downloadDir\BrockBlaze\windows\scripts\*" -Destination $scriptsDir -Force
+Copy-Item -Path "$downloadDir\BrockBlaze\windows\zabbix_agentd.conf" -Destination "$installDir" -Force
+
+# Install Zabbix Agent
 Write-Host "Installing Zabbix Agent..."
-Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $downloadDir\windows\zabbix_agent.msi /quiet" -Wait
+$installerPath = "$downloadDir\BrockBlaze\windows\zabbix_agent.msi"
+Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $installerPath /quiet" -Wait
 
-if (Test-Path $downloadDir) {
-    Write-Host "Cleaning up existing directory: $downloadDir"
-    # Remove-Item -Recurse -Force $downloadDir
-}
+# Set Permissions and Execution Policies
+Write-Host "Setting permissions..."
+Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Bypass -Force
 
-# Step 2: Clone repository
-Write-Host "Cloning repository..."
-git clone $repoUrl $downloadDir
-
-# Step 3: Copy custom scripts
-Write-Host "Copying scripts..."
-New-Item -ItemType Directory -Path $scriptsDir -Force
-Copy-Item -Path "$downloadDir\windows\scripts\*" -Destination $scriptsDir -Recurse -Force
-
-# Step 4: Update configuration file
-Write-Host "Updating configuration file..."
-Copy-Item -Path "$downloadDir\windows\zabbix_agentd.conf" -Destination $configFile -Force
-
-# Replace placeholders in the configuration file
-(Get-Content $configFile) -replace 'Server=.*', "Server=$zabbixServerIP" `
-    -replace 'Hostname=.*', "Hostname=$hostname" `
-| Set-Content $configFile
-
-# Step 5: Restart and enable service
-Write-Host "Restarting Zabbix Agent service..."
+# Configure Zabbix Agent Service
+Write-Host "Configuring Zabbix Agent service..."
 Restart-Service -Name "Zabbix Agent"
 Set-Service -Name "Zabbix Agent" -StartupType Automatic
 
-# Cleanup
-# Write-Host "Cleaning up temporary files..."
-# Remove-Item -Recurse -Force $downloadDir
-
-Write-Host "Zabbix Agent installed and configured successfully!"
+# Clean up
+Write-Host "Cleaning up..."
+Remove-Item -Path $zipPath -Force
+Write-Host "Installation completed successfully!"

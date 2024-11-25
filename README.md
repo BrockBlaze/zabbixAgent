@@ -30,6 +30,8 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 
 1. Download and install [Git](https://git-scm.com/download/win).
 
+2. Download and install [OpenHardwareMonitor](https://openhardwaremonitor.org/downloads/).
+
 2. Run this in PowerShell:
    ```powershell
    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/BrockBlaze/zabbixAgent/main/windows/install.ps1" -OutFile "install.ps1"
