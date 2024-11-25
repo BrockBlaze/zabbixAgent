@@ -19,12 +19,12 @@ Expand-Archive -Path $zipPath -DestinationPath $downloadDir -Force
 
 # Copy configuration and scripts
 Write-Host "Copying configuration and scripts..."
-Copy-Item -Path "$downloadDir\BrockBlaze\windows\scripts\*" -Destination $scriptsDir -Force
-Copy-Item -Path "$downloadDir\BrockBlaze\windows\zabbix_agentd.conf" -Destination "$installDir" -Force
+Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\scripts\*" -Destination $scriptsDir -Force
+Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\zabbix_agentd.conf" -Destination "$installDir" -Force
 
 # Install Zabbix Agent
 Write-Host "Installing Zabbix Agent..."
-$installerPath = "$downloadDir\BrockBlaze\windows\zabbix_agent.msi"
+$installerPath = "$downloadDir\zabbixAgent-main\windows\zabbix_agent.msi"
 Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $installerPath /quiet" -Wait
 
 # Set Permissions and Execution Policies
