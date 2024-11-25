@@ -1,5 +1,5 @@
 # Set Variables
-$repoUrl = "https://github.com/BrockBlaze/zabbixAgnet/archive/refs/heads/main.zip"
+$repoUrl = "https://github.com/BrockBlaze/zabbixAgent/archive/refs/heads/main.zip"
 $downloadDir = "C:\Temp\zabbixAgent"
 $installDir = "C:\Program Files\Zabbix Agent"
 $scriptsDir = "$installDir\scripts"
