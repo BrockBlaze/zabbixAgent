@@ -21,7 +21,7 @@ Expand-Archive -Path $zipPath -DestinationPath $downloadDir -Force
 # Install Zabbix Agent
 Write-Host "Installing Zabbix Agent..."
 $installerPath = "$downloadDir\zabbixAgent-main\windows\zabbix_agent.msi"
-Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $installerPath /quiet" -Wait
+Start-Process -FilePath "msiexec.exe" -ArgumentList "/i $installerPath /qn" -Wait
 
 # Copy configuration and scripts
 Write-Host "Copying configuration and scripts..."
