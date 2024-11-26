@@ -56,6 +56,7 @@ else {
 # Configure Zabbix Agent Service
 Write-Host "Configuring Zabbix Agent service..."
 Restart-Service -Name "Zabbix Agent"
+Restart-Service -Name "Zabbix Agent"
 Set-Service -Name "Zabbix Agent" -StartupType Automatic
 
 # Clean up
