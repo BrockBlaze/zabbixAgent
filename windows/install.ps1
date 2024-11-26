@@ -18,11 +18,6 @@ Invoke-WebRequest -Uri $repoUrl -OutFile $zipPath
 Write-Host "Extracting repository..."
 Expand-Archive -Path $zipPath -DestinationPath $downloadDir -Force
 
-# Copy configuration and scripts
-Write-Host "Copying configuration and scripts..."
-Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\scripts\*" -Destination $scriptsDir -Force
-Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\zabbix_agentd.conf" -Destination "$installDir" -Force
-
 # Install Zabbix Agent
 Write-Host "Installing Zabbix Agent..."
 $installerPath = "$downloadDir\zabbixAgent-main\windows\zabbix_agent.msi"
@@ -31,6 +26,11 @@ Start-Process  $installerPath -Wait
 # Set Permissions and Execution Policies
 Write-Host "Setting permissions..."
 Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Bypass -Force
+
+# Copy configuration and scripts
+Write-Host "Copying configuration and scripts..."
+Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\scripts\*" -Destination $scriptsDir -Force
+Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\zabbix_agentd.conf" -Destination "$installDir" -Force
 
 # Configure Zabbix Agent Service
 Write-Host "Configuring Zabbix Agent service..."
