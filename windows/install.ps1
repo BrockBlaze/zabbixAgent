@@ -27,6 +27,11 @@ Start-Process  $installerPath -Wait
 Write-Host "Setting permissions..."
 Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Bypass -Force
 
+#Create Zabbix Agent Script Directory
+if (-Not (Test-Path -Path $scriptsDir)) {
+    New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
+}
+
 # Copy configuration and scripts
 Write-Host "Copying configuration and scripts..."
 Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\scripts\*" -Destination $scriptsDir -Force
