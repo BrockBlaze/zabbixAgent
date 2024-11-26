@@ -4,6 +4,7 @@ $tempDir = "C:\Temp"
 $downloadDir = "C:\Temp\zabbixAgent"
 $installDir = "C:\Program Files\Zabbix Agent"
 $scriptsDir = "$installDir\scripts"
+$configFile = "$installDir\zabbix_agentd.conf"
 
 # Ensure required folders exist
 if (-Not (Test-Path -Path $downloadDir)) {
@@ -33,9 +34,24 @@ if (-Not (Test-Path -Path $scriptsDir)) {
 }
 
 # Copy configuration and scripts
-Write-Host "Copying configuration and scripts..."
+Write-Host "Copying scripts..."
 Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\scripts\*" -Destination $scriptsDir -Force
-Copy-Item -Path "$downloadDir\zabbixAgent-main\windows\zabbix_agentd.conf" -Destination "$installDir" -Force
+
+# Add UserParameter entries to configuration file
+Write-Host "Adding UserParameter entries to configuration..."
+$customParameters = @"
+# Custom UserParameters
+UserParameter=login.attempts,powershell -ExecutionPolicy Bypass -File "$scriptsDir\login_monitoring.ps1"
+UserParameter=cpu.temperature,powershell -ExecutionPolicy Bypass -File "$scriptsDir\cpu_temp.ps1"
+"@
+
+if (Test-Path $configFile) {
+    Add-Content -Path $configFile -Value $customParameters
+}
+else {
+    Write-Host "Configuration file not found! Creating a new one..."
+    Set-Content -Path $configFile -Value $customParameters
+}
 
 # Configure Zabbix Agent Service
 Write-Host "Configuring Zabbix Agent service..."
