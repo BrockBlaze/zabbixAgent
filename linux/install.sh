@@ -53,17 +53,17 @@ sed -i "s/^#Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
 
 # Add custom UserParameter for Zabbix agent
 if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; then
-  echo "Added UserParameter for CPU temperature" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+  echo "UserParameter=cpu.temperature,/etc/zabbix/scripts/cpu_temp.sh" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # Add custom UserParameter for Zabbix agent
 if ! grep -q "UserParameter=login.attempts" /etc/zabbix/zabbix_agentd.conf; then
-  echo "Added UserParameter for login attempts" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+  echo "UserParameter=login.attempts,/etc/zabbix/scripts/login_monitoring.sh" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # Add custom UserParameter for Zabbix agent
-if ! grep -q "UserParameter=custom.top_cpu_processes",ps pid,comm,%cpu --sort=-%cpu | head -n 6; then
-  echo "Added UserParameter for top CPU processes" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+if ! grep -q "UserParameter=custom.top_cpu_processes" /etc/zabbix/zabbix_agentd.conf; then
+  echo 'UserParameter=custom.top_cpu_processes,ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6' | sudo tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # Restart the Zabbix agent service to apply the changes
