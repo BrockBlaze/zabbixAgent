@@ -4,7 +4,7 @@
 sensors_output=$(sensors)
 
 # Extract the CPU temperature for "Core 0" (adjust the grep pattern as needed for your system)
-cpu_temp=$(echo "$sensors_output" | grep -i 'Sensor 1' | awk '{print $3}' | tr -d '+°C')
+cpu_temp=$(echo "$sensors_output" | grep -i 'Tctl' | awk '{print $3}' | tr -d '+°C')
 
 # If the temperature is not found, provide a default value
 if [[ -n "$cpu_temp" ]]; then
