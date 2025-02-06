@@ -21,10 +21,17 @@ This repository provides an automated installer for setting up the Zabbix Agent 
 1. Run this in the terminal:
    ```bash
    git clone https://github.com/BrockBlaze/zabbixAgent.git
+   ```
+   ```bash
    cd zabbixAgent
+   ```
+   ```bash
    sudo chmod +x linux/install.sh
+   ```
+   ```bash
    sudo ./linux/install.sh
    ```
+   
 
 ### Windows
 
