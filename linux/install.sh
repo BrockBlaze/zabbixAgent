@@ -80,3 +80,4 @@ sudo rm -rf "$SOURCE_DIR"
 sudo rm -rf "$START_DIR"
 
 echo "Installation completed successfully!"
+
