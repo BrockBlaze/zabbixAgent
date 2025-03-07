@@ -5,6 +5,9 @@ FAILED_LOG="/var/log/auth.log"
 TIMEFRAME="1hour ago"
 LOG_FILE="/var/log/zabbix/monitoring.log"
 
+# Check if a specific metric was requested
+OUTPUT_METRIC="$1"
+
 log() {
     # Try to write to log file, but don't fail if we can't
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOG_FILE" 2>/dev/null || true
@@ -40,11 +43,19 @@ current_time=$(date '+%Y-%m-%d %H:%M:%S')
 # Log the results
 log "Login statistics for past hour: Success=$successful_logins Failed=$failed_logins Total=$total_attempts"
 
-# Output JSON directly without cat for better compatibility
-echo "{"
-echo "    \"timestamp\": \"$current_time\","
-echo "    \"successful_logins\": $successful_logins,"
-echo "    \"failed_logins\": $failed_logins,"
-echo "    \"total_attempts\": $total_attempts,"
-echo "    \"timeframe\": \"past hour\""
-echo "}" 
+# Output based on the requested metric
+if [ "$OUTPUT_METRIC" = "failed_logins" ]; then
+    echo "$failed_logins"
+elif [ "$OUTPUT_METRIC" = "successful_logins" ]; then
+    echo "$successful_logins"
+elif [ "$OUTPUT_METRIC" = "total_attempts" ]; then
+    echo "$total_attempts"
+else
+    # Default: output JSON with all metrics
+    echo "{"
+    echo "    \"timestamp\": \"$current_time\","
+    echo "    \"successful_logins\": $successful_logins,"
+    echo "    \"failed_logins\": $failed_logins,"
+    echo "    \"total_attempts\": $total_attempts,"
+    echo "    \"timeframe\": \"past hour\""
+    echo "}" 

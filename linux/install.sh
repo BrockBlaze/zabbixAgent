@@ -99,9 +99,22 @@ if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; the
     echo "UserParameter=cpu.temperature,/etc/zabbix/enhanced_scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
-# Login monitoring
+# Login monitoring - full JSON
 if ! grep -q "UserParameter=login.monitoring" /etc/zabbix/zabbix_agentd.conf; then
     echo "UserParameter=login.monitoring,/etc/zabbix/enhanced_scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
+# Login monitoring - individual metrics
+if ! grep -q "UserParameter=login.monitoring.failed_logins" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.failed_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh failed_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
+if ! grep -q "UserParameter=login.monitoring.successful_logins" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.successful_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh successful_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
+if ! grep -q "UserParameter=login.monitoring.total_attempts" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.total_attempts,/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # System health monitoring
