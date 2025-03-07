@@ -14,9 +14,15 @@ get_cpu_temp() {
     local cpu_temp
     
     # Try different temperature sources
-    for source in "Tctl" "Core 0" "CPU" "Package id 0"; do
+    for source in "Tctl" "Core 0" "CPU" "Package id 0" "Composite"; do
         sensors_output=$(sensors 2>/dev/null)
-        cpu_temp=$(echo "$sensors_output" | grep -i "$source" | awk '{print $2}' | tr -d '+°C')
+        
+        if [[ "$source" == "Composite" ]]; then
+            # Special handling for NVMe Composite temperature
+            cpu_temp=$(echo "$sensors_output" | grep -i "Composite:" | head -n 1 | awk '{print $2}' | tr -d '+°C')
+        else
+            cpu_temp=$(echo "$sensors_output" | grep -i "$source" | awk '{print $2}' | tr -d '+°C')
+        fi
         
         if [[ -n "$cpu_temp" ]]; then
             log "Temperature found from source: $source"
@@ -24,6 +30,14 @@ get_cpu_temp() {
             return 0
         fi
     done
+    
+    # If we get here, try any temperature value as a last resort
+    cpu_temp=$(echo "$sensors_output" | grep -E '[-+][0-9.]+°C' | head -n 1 | awk '{print $2}' | tr -d '+°C')
+    if [[ -n "$cpu_temp" ]]; then
+        log "Temperature found from generic source"
+        echo "$cpu_temp"
+        return 0
+    fi
     
     return 1
 }
