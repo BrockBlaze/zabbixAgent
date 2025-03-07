@@ -40,13 +40,11 @@ current_time=$(date '+%Y-%m-%d %H:%M:%S')
 # Log the results
 log "Login statistics for past hour: Success=$successful_logins Failed=$failed_logins Total=$total_attempts"
 
-# Output in JSON format for better Zabbix integration
-cat << EOF
-{
-    "timestamp": "$current_time",
-    "successful_logins": $successful_logins,
-    "failed_logins": $failed_logins,
-    "total_attempts": $total_attempts,
-    "timeframe": "past hour"
-}
-EOF 
+# Output JSON directly without cat for better compatibility
+echo "{"
+echo "    \"timestamp\": \"$current_time\","
+echo "    \"successful_logins\": $successful_logins,"
+echo "    \"failed_logins\": $failed_logins,"
+echo "    \"total_attempts\": $total_attempts,"
+echo "    \"timeframe\": \"past hour\""
+echo "}" 
