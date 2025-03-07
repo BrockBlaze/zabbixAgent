@@ -5,79 +5,124 @@ REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
 USERNAME=$(logname)
 START_DIR="/home/$USERNAME/zabbixAgent"
 SOURCE_DIR="/zabbixAgent"
-TARGET_DIR="/zabbixAgent/linux/scripts"
+TARGET_DIR="/zabbixAgent/linux/enhanced_scripts"
 SCRIPTS_DIR="/etc/zabbix/"
+LOG_FILE="/var/log/zabbix/install.log"
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+error() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" | tee -a "$LOG_FILE"
+    exit 1
+}
+
+# Create log directory
+mkdir -p "$(dirname $LOG_FILE)"
+log "Starting Zabbix Agent installation..."
+
+# Check system compatibility
+if ! grep -q 'Ubuntu\|Debian' /etc/os-release; then
+    error "This script only supports Ubuntu/Debian systems"
+fi
 
 # Ask for the Zabbix server IP and hostname
 read -p "Enter Zabbix Server IP: " ZABBIX_SERVER_IP
 read -p "Enter Hostname (this server's name): " HOSTNAME
 
-# Install the Zabbix agent (Debian-based systems)
-echo "Installing Zabbix Agent..."
-sudo apt update
-sudo apt install -y zabbix-agent
+if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
+    error "Zabbix Server IP and Hostname are required"
+fi
 
-echo "Installing Sensors..."
+# Install the Zabbix agent
+log "Installing Zabbix Agent..."
+apt update || error "Failed to update package list"
+apt install -y zabbix-agent || error "Failed to install Zabbix agent"
+
+log "Installing Sensors..."
 # Install lm-sensors
-sudo apt install -y lm-sensors
+apt install -y lm-sensors || error "Failed to install lm-sensors"
 
-echo "Automatically Detecting Sensors..."
+log "Automatically Detecting Sensors..."
 # Configure sensors (automatic detection)
-yes | sudo sensors-detect
+yes | sensors-detect || log "Warning: sensors-detect may not have completed successfully"
 
 # Clone the repository
-echo "Cloning repository..."
-git clone "$REPO_URL" "$SOURCE_DIR" || { echo "Failed to clone repository"; exit 1; }
+log "Cloning repository..."
+git clone "$REPO_URL" "$SOURCE_DIR" || error "Failed to clone repository"
 
 # Ensuring the target directory exists
-echo "Ensuring the target directory exists..."
-sudo mkdir -p "$SCRIPTS_DIR" || { echo "Failed to create the target directory."; exit 1; }
+log "Ensuring the target directory exists..."
+mkdir -p "$SCRIPTS_DIR" || error "Failed to create the target directory"
 
 # Moving scripts to the target directory
-echo "Moving scripts to the target directory..."
-sudo cp -r "$TARGET_DIR" "$SCRIPTS_DIR" || { echo "Failed to move scripts."; exit 1; }
+log "Moving scripts to the target directory..."
+cp -r "$TARGET_DIR" "$SCRIPTS_DIR" || error "Failed to move scripts"
 
 # Setting permissions
-echo "Setting permissions..."
-sudo chmod +x "$SCRIPTS_DIR"/scripts/*.sh || { echo "Failed to set permissions."; exit 1; }
+log "Setting permissions..."
+chmod +x "$SCRIPTS_DIR"/enhanced_scripts/*.sh || error "Failed to set permissions"
 
-# Backup the original configuration file (in case something goes wrong)
-cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup
+# Backup the original configuration file
+log "Backing up original configuration..."
+cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup || error "Failed to backup configuration"
 
-# Modify the zabbix_agentd.conf file to include the user input
-echo "Configuring Zabbix agent..."
+# Modify the zabbix_agentd.conf file
+log "Configuring Zabbix agent..."
 
 # Replace placeholders with actual values
-sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf
-sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
+sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
+sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
 
-# Add custom UserParameter for Zabbix agent
+# Add custom UserParameters
+log "Adding custom UserParameters..."
+
+# CPU Temperature monitoring
 if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; then
-  echo "UserParameter=cpu.temperature,/etc/zabbix/scripts/cpu_temp.sh" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=cpu.temperature,/etc/zabbix/enhanced_scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
-# Add custom UserParameter for Zabbix agent
-if ! grep -q "UserParameter=login.attempts" /etc/zabbix/zabbix_agentd.conf; then
-  echo "UserParameter=login.attempts,/etc/zabbix/scripts/login_monitoring.sh" | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+# Login monitoring
+if ! grep -q "UserParameter=login.monitoring" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring,/etc/zabbix/enhanced_scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
-# Add custom UserParameter for Zabbix agent
-if ! grep -q "UserParameter=custom.top_cpu_processes" /etc/zabbix/zabbix_agentd.conf; then
-  echo 'UserParameter=custom.top_cpu_processes,ps -eo pid,comm,%cpu --sort=-%cpu | head -n 6' | sudo tee -a /etc/zabbix/zabbix_agentd.conf
+# System health monitoring
+if ! grep -q "UserParameter=system.health" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=system.health,/etc/zabbix/enhanced_scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
-# Restart the Zabbix agent service to apply the changes
-sudo systemctl restart zabbix-agent
+# Validate configuration
+log "Validating configuration..."
+zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf || error "Configuration validation failed"
 
-# Enable the Zabbix agent service to start on boot
-sudo systemctl enable zabbix-agent
+# Restart the Zabbix agent service
+log "Restarting Zabbix agent..."
+systemctl restart zabbix-agent || error "Failed to restart Zabbix agent"
 
-echo "Zabbix Agent installed and configured!"
+# Enable the Zabbix agent service
+log "Enabling Zabbix agent service..."
+systemctl enable zabbix-agent || error "Failed to enable Zabbix agent"
+
+# Verify service status
+log "Verifying service status..."
+if ! systemctl is-active --quiet zabbix-agent; then
+    error "Zabbix agent service is not running"
+fi
 
 # Clean up
-echo "Cleaning up..."
-sudo rm -rf "$SOURCE_DIR"
-sudo rm -rf "$START_DIR"
+log "Cleaning up..."
+rm -rf "$SOURCE_DIR" || log "Warning: Failed to remove source directory"
+rm -rf "$START_DIR" || log "Warning: Failed to remove start directory"
 
-echo "Installation completed successfully!"
+log "Installation completed successfully!"
+echo
+echo "Zabbix Agent has been installed and configured successfully!"
+echo "Configuration file: /etc/zabbix/zabbix_agentd.conf"
+echo "Log file: $LOG_FILE"
+echo "Enhanced monitoring scripts are installed in: $SCRIPTS_DIR/enhanced_scripts/"
+echo
+echo "To uninstall, run: ./uninstall.sh"
 
