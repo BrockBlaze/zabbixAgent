@@ -65,6 +65,21 @@ cp -r "$TARGET_DIR" "$SCRIPTS_DIR" || error "Failed to move scripts"
 log "Setting permissions..."
 chmod +x "$SCRIPTS_DIR"/enhanced_scripts/*.sh || error "Failed to set permissions"
 
+# Create dedicated log directory with proper permissions
+log "Creating log directory with proper permissions..."
+mkdir -p /var/log/zabbix || error "Failed to create log directory"
+chown -R zabbix:zabbix /var/log/zabbix || error "Failed to set permissions on log directory"
+
+# Configure sudo permissions for the zabbix user
+log "Configuring sudo permissions for Zabbix user..."
+# Create a sudoers file for zabbix
+cat > /etc/sudoers.d/zabbix << EOF
+# Allow zabbix user to access system logs and run specific commands without password
+zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee
+Defaults:zabbix !requiretty
+EOF
+chmod 440 /etc/sudoers.d/zabbix || error "Failed to set permissions on sudoers file"
+
 # Backup the original configuration file
 log "Backing up original configuration..."
 cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup || error "Failed to backup configuration"

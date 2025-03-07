@@ -6,14 +6,16 @@ TIMEFRAME="1hour ago"
 LOG_FILE="/var/log/zabbix/monitoring.log"
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+    # Try to write to log file, but don't fail if we can't
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOG_FILE" 2>/dev/null || true
 }
 
-# Ensure log directory exists
-mkdir -p "$(dirname $LOG_FILE)"
+# Ensure log directory exists with proper permissions
+sudo mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
+sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" 2>/dev/null || true
 
 # Get successful logins
-successful_logins=$(last -s "$TIMEFRAME" | grep -v "reboot" | grep -v "^$" | wc -l)
+successful_logins=$(sudo last -s "$TIMEFRAME" | grep -v "reboot" | grep -v "^$" | wc -l)
 if [ $? -ne 0 ]; then
     log "Error getting successful logins"
     successful_logins=0
@@ -21,7 +23,7 @@ fi
 
 # Get failed login attempts
 if [ -f "$FAILED_LOG" ]; then
-    failed_logins=$(grep "Failed password" "$FAILED_LOG" | awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | wc -l)
+    failed_logins=$(sudo grep "Failed password" "$FAILED_LOG" 2>/dev/null | awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | wc -l)
     if [ $? -ne 0 ]; then
         log "Error getting failed logins"
         failed_logins=0

@@ -6,7 +6,8 @@ SLEEP_BETWEEN_RETRIES=2
 LOG_FILE="/var/log/zabbix/monitoring.log"
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+    # Try to write to log file, but don't fail if we can't
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOG_FILE" 2>/dev/null || true
 }
 
 get_cpu_temp() {
@@ -15,7 +16,7 @@ get_cpu_temp() {
     
     # Try different temperature sources
     for source in "Tctl" "Core 0" "CPU" "Package id 0" "Composite"; do
-        sensors_output=$(sensors 2>/dev/null)
+        sensors_output=$(sudo sensors 2>/dev/null)
         
         if [[ "$source" == "Composite" ]]; then
             # Special handling for NVMe Composite temperature
@@ -42,8 +43,9 @@ get_cpu_temp() {
     return 1
 }
 
-# Ensure log directory exists
-mkdir -p "$(dirname $LOG_FILE)"
+# Ensure log directory exists with proper permissions
+sudo mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
+sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" 2>/dev/null || true
 
 # Main logic with retries
 for ((i=1; i<=MAX_RETRIES; i++)); do
