@@ -16,11 +16,10 @@ sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 # Format the output as JSON for Zabbix
 current_time=$(date '+%Y-%m-%d %H:%M:%S')
 
-# Skip htop entirely and use ps, which is guaranteed to work on all Linux systems
-# Sort processes by CPU usage (highest first)
-ps_output=$(sudo ps aux --sort=-%cpu | head -n 20)
+# Get process information without using sudo (ps doesn't need sudo)
+ps_output=$(ps aux --sort=-%cpu | head -n 20 2>/dev/null || echo "Failed to get process list")
 
-# Add system resource information 
+# Add system resource information (none of these commands need sudo)
 system_info="=== SYSTEM RESOURCES ===\n"
 system_info+="CPU Usage: $(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')%\n"
 system_info+="Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')\n"
