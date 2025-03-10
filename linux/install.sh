@@ -117,6 +117,16 @@ if ! grep -q "UserParameter=login.monitoring.total_attempts" /etc/zabbix/zabbix_
     echo "UserParameter=login.monitoring.total_attempts,/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
+# User detailed login information
+if ! grep -q "UserParameter=login.monitoring.user_details" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.user_details,/etc/zabbix/enhanced_scripts/login_monitoring.sh user_details" | tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
+# Login events with IP addresses
+if ! grep -q "UserParameter=login.monitoring.events" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.events,/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
 # System health monitoring
 if ! grep -q "UserParameter=system.health" /etc/zabbix/zabbix_agentd.conf; then
     echo "UserParameter=system.health,/etc/zabbix/enhanced_scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
