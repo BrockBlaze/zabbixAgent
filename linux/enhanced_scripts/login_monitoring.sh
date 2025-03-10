@@ -18,16 +18,16 @@ log() {
 sudo mkdir -p "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 
-# Get successful logins
-successful_logins=$(sudo last -s "$TIMEFRAME" | grep -v "reboot" | grep -v "^$" | wc -l)
+# Get successful logins - excluding Zabbix agent activities
+successful_logins=$(sudo last -s "$TIMEFRAME" | grep -v "reboot" | grep -v "^$" | grep -v "zabbix" | wc -l)
 if [ $? -ne 0 ]; then
     log "Error getting successful logins"
     successful_logins=0
 fi
 
-# Get failed login attempts
+# Get failed login attempts - excluding Zabbix agent activities
 if [ -f "$FAILED_LOG" ]; then
-    failed_logins=$(sudo grep "Failed password" "$FAILED_LOG" 2>/dev/null | awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | wc -l)
+    failed_logins=$(sudo grep "Failed password" "$FAILED_LOG" 2>/dev/null | grep -v "zabbix" | awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | wc -l)
     if [ $? -ne 0 ]; then
         log "Error getting failed logins"
         failed_logins=0
