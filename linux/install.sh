@@ -156,6 +156,7 @@ rm -rf "$SOURCE_DIR" || log "Warning: Failed to remove source directory"
 rm -rf "$START_DIR" || log "Warning: Failed to remove start directory"
 
 log "Installation completed successfully!"
+cd ~
 echo
 echo "Zabbix Agent has been installed and configured successfully!"
 echo "Configuration file: /etc/zabbix/zabbix_agentd.conf"
