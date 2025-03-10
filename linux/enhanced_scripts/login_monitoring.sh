@@ -59,4 +59,5 @@ else
     echo "    \"failed_logins\": $failed_logins,"
     echo "    \"total_attempts\": $total_attempts,"
     echo "    \"timeframe\": \"past hour\""
-    echo "}" 
+    echo "}"
+fi 
