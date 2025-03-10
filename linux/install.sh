@@ -45,6 +45,10 @@ log "Installing Sensors..."
 # Install lm-sensors
 apt install -y lm-sensors || error "Failed to install lm-sensors"
 
+log "Installing htop..."
+# Install htop for system monitoring
+apt install -y htop || error "Failed to install htop"
+
 log "Automatically Detecting Sensors..."
 # Configure sensors (automatic detection)
 yes | sensors-detect || log "Warning: sensors-detect may not have completed successfully"
@@ -75,7 +79,7 @@ log "Configuring sudo permissions for Zabbix user..."
 # Create a sudoers file for zabbix
 cat > /etc/sudoers.d/zabbix << EOF
 # Allow zabbix user to access system logs and run specific commands without password
-zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee
+zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /usr/bin/htop, /usr/bin/apt-get
 Defaults:zabbix !requiretty
 EOF
 chmod 440 /etc/sudoers.d/zabbix || error "Failed to set permissions on sudoers file"
@@ -125,6 +129,11 @@ fi
 # Login events with IP addresses
 if ! grep -q "UserParameter=login.monitoring.events" /etc/zabbix/zabbix_agentd.conf; then
     echo "UserParameter=login.monitoring.events,/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
+fi
+
+# System htop monitoring
+if ! grep -q "UserParameter=system.htop" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # System health monitoring

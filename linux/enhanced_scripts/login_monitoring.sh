@@ -32,28 +32,24 @@ if [ -z "$successful_users_json" ]; then
     successful_users_json="\"\": 0"
 fi
 
-# Get successful login IPs from auth.log
+# Get successful login IPs from auth.log - LIMIT TO LAST 10
 successful_ips_json=""
 if [ -f "$FAILED_LOG" ]; then
-    successful_ips=$(sudo grep "Accepted password" "$FAILED_LOG" 2>/dev/null | grep -v "zabbix" | 
-                    awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | 
-                    grep -oP "from \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | sort | uniq -c | sort -nr)
+    # Get the last 10 successful logins
+    successful_events=()
+    while IFS= read -r line; do
+        timestamp=$(echo "$line" | awk '{print $1" "$2" "$3}')
+        user=$(echo "$line" | grep -oP "for \K[^ ]+" | head -1)
+        ip=$(echo "$line" | grep -oP "from \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+        if [ -n "$timestamp" ] && [ -n "$user" ] && [ -n "$ip" ]; then
+            event="{\"time\":\"$timestamp\",\"user\":\"$user\",\"ip\":\"$ip\",\"status\":\"success\"}"
+            successful_events+=("$event")
+        fi
+    done < <(sudo grep "Accepted password" "$FAILED_LOG" 2>/dev/null | grep -v "zabbix" | 
+           awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | tail -10)
     
-    if [ -n "$successful_ips" ]; then
-        # Create detailed login events with timestamp, user, and IP
-        successful_events=()
-        while IFS= read -r line; do
-            timestamp=$(echo "$line" | awk '{print $1" "$2" "$3}')
-            user=$(echo "$line" | grep -oP "for \K[^ ]+" | head -1)
-            ip=$(echo "$line" | grep -oP "from \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | head -1)
-            if [ -n "$timestamp" ] && [ -n "$user" ] && [ -n "$ip" ]; then
-                event="{\"time\":\"$timestamp\",\"user\":\"$user\",\"ip\":\"$ip\",\"status\":\"success\"}"
-                successful_events+=("$event")
-            fi
-        done < <(sudo grep "Accepted password" "$FAILED_LOG" 2>/dev/null | grep -v "zabbix" | 
-               awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date')
-        
-        # Join the events into a JSON array
+    # Join the events into a JSON array
+    if [ ${#successful_events[@]} -gt 0 ]; then
         successful_events_json=$(printf ",%s" "${successful_events[@]}")
         successful_events_json="[${successful_events_json:1}]"  # Remove the leading comma
     else
@@ -61,7 +57,7 @@ if [ -f "$FAILED_LOG" ]; then
     fi
 fi
 
-# Get failed login attempts - excluding Zabbix agent activities
+# Get failed login attempts - excluding Zabbix agent activities (KEEP ALL FAILED LOGINS)
 if [ -f "$FAILED_LOG" ]; then
     failed_logins=$(sudo grep "Failed password" "$FAILED_LOG" 2>/dev/null | grep -v "zabbix" | 
                    awk -v date="$(date -d "$TIMEFRAME" '+%b %d %H:%M:%S')" '$0 > date' | wc -l)
@@ -72,7 +68,7 @@ if [ -f "$FAILED_LOG" ]; then
                   grep -oP "for \K[^ ]+" | sort | uniq -c | sort -nr)
     failed_users_json=$(echo "$failed_users" | awk '{print "\"" $2 "\": " $1}' | paste -sd "," -)
     
-    # Get failed login IPs
+    # Get failed login IPs - Keep all failed logins
     failed_ips=()
     while IFS= read -r line; do
         timestamp=$(echo "$line" | awk '{print $1" "$2" "$3}')
