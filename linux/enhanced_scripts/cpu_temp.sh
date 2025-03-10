@@ -27,6 +27,7 @@ get_cpu_temp() {
         
         if [[ -n "$cpu_temp" ]]; then
             log "Temperature found from source: $source"
+            # Return only the number
             echo "$cpu_temp"
             return 0
         fi
@@ -36,6 +37,7 @@ get_cpu_temp() {
     cpu_temp=$(echo "$sensors_output" | grep -E '[-+][0-9.]+°C' | head -n 1 | awk '{print $2}' | tr -d '+°C')
     if [[ -n "$cpu_temp" ]]; then
         log "Temperature found from generic source"
+        # Return only the number
         echo "$cpu_temp"
         return 0
     fi
@@ -50,6 +52,7 @@ sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" 2>/dev/null || true
 # Main logic with retries
 for ((i=1; i<=MAX_RETRIES; i++)); do
     if temp=$(get_cpu_temp); then
+        # Output just the temperature number and nothing else
         echo "$temp"
         exit 0
     fi
@@ -62,6 +65,7 @@ for ((i=1; i<=MAX_RETRIES; i++)); do
     fi
 done
 
+# If we can't get a temperature, return a specific error value that Zabbix can handle
 log "Error: Could not retrieve CPU temperature after $MAX_RETRIES attempts"
-echo "Error: Could not retrieve CPU temperature after $MAX_RETRIES attempts"
+echo "-273.15"
 exit 1 
