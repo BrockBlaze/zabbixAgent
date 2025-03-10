@@ -10,12 +10,13 @@ OUTPUT_METRIC="$1"
 
 log() {
     # Try to write to log file, but don't fail if we can't
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOG_FILE" 2>/dev/null || true
+    # Redirect to /dev/null to prevent output to stdout
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOG_FILE" > /dev/null 2>&1 || true
 }
 
 # Ensure log directory exists with proper permissions
-sudo mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
-sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" 2>/dev/null || true
+sudo mkdir -p "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
+sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 
 # Get successful logins
 successful_logins=$(sudo last -s "$TIMEFRAME" | grep -v "reboot" | grep -v "^$" | wc -l)
