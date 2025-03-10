@@ -27,8 +27,15 @@ if ! command -v htop &> /dev/null; then
 fi
 
 # Capture htop output in batch mode (non-interactive)
-# We'll capture the first 20 processes
-htop_output=$(sudo htop -d 1 -n 1 -C --delay=0 2>&1 | head -n 25)
+# Using more compatible parameters
+htop_output=$(sudo htop -C -d 1 --delay=0 -b 2>&1 | head -n 25)
+
+# If batch mode fails, try just piping the output (more compatible approach)
+if [[ $? -ne 0 ]]; then
+    log "Htop failed with specific parameters, trying simpler approach"
+    # Fall back to ps command which is more reliable
+    htop_output=$(sudo ps aux --sort=-%cpu | head -n 20)
+fi
 
 # Format the output as JSON for Zabbix
 current_time=$(date '+%Y-%m-%d %H:%M:%S')
