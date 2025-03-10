@@ -13,38 +13,30 @@ log() {
 sudo mkdir -p "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 
-# Check if htop is installed
-if ! command -v htop &> /dev/null; then
-    log "htop not installed, trying to install it"
-    # Try to install htop
-    sudo apt-get update > /dev/null 2>&1
-    sudo apt-get install -y htop > /dev/null 2>&1
-    if [ $? -ne 0 ]; then
-        log "Failed to install htop"
-        echo "ERROR: htop not installed and failed to install it"
-        exit 1
-    fi
-fi
-
-# Capture htop output in batch mode (non-interactive)
-# Using more compatible parameters
-htop_output=$(sudo htop -C -d 1 --delay=0 -b 2>&1 | head -n 25)
-
-# If batch mode fails, try just piping the output (more compatible approach)
-if [[ $? -ne 0 ]]; then
-    log "Htop failed with specific parameters, trying simpler approach"
-    # Fall back to ps command which is more reliable
-    htop_output=$(sudo ps aux --sort=-%cpu | head -n 20)
-fi
-
 # Format the output as JSON for Zabbix
 current_time=$(date '+%Y-%m-%d %H:%M:%S')
 
+# Skip htop entirely and use ps, which is guaranteed to work on all Linux systems
+# Sort processes by CPU usage (highest first)
+ps_output=$(sudo ps aux --sort=-%cpu | head -n 20)
+
+# Add system resource information 
+system_info="=== SYSTEM RESOURCES ===\n"
+system_info+="CPU Usage: $(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}')%\n"
+system_info+="Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2}')\n"
+system_info+="Swap Usage: $(free -m | awk 'NR==3{printf "%.2f%%", $3*100/$2}')\n"
+system_info+="Disk Usage: $(df -h / | awk 'NR==2{print $5}')\n"
+system_info+="Load Average: $(cat /proc/loadavg | awk '{print $1, $2, $3}')\n"
+system_info+="=== TOP PROCESSES ===\n"
+
+# Combine system info with process list
+full_output="${system_info}${ps_output}"
+
 # Replace special characters to make it valid JSON
-htop_json=$(echo "$htop_output" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\n/\\n/g' | tr '\n' ' ' | sed 's/\t/    /g')
+output_json=$(echo "$full_output" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' ' ' | sed 's/\t/    /g' | sed 's/  / /g')
 
 # Output the JSON
 echo "{"
 echo "    \"timestamp\": \"$current_time\","
-echo "    \"htop_output\": \"$htop_json\""
+echo "    \"system_info\": \"$output_json\""
 echo "}" 
