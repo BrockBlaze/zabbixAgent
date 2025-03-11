@@ -12,34 +12,66 @@ log() {
 sudo mkdir -p "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 
-# Format the output as JSON for Zabbix
-current_time=$(date '+%Y-%m-%d %H:%M:%S')
-
 # Get process information without using sudo (ps doesn't need sudo)
 ps_output=$(ps aux --sort=-%cpu | head -n 11 2>/dev/null || echo "Failed to get process list")
 
-# Extract just the process names and CPU usage into JSON format
-process_json="["
-IFS=$'\n'
+# Initialize arrays for process names and CPU values
+declare -a process_names
+declare -a process_cpus
+
+# Parse parameter if provided
+param="$1"
+
+# Extract process information into arrays
 process_count=0
-for line in $(echo "$ps_output" | tail -n +2); do
+while read -r line; do
     if [ $process_count -lt 10 ]; then
-        name=$(echo "$line" | awk '{print $11}' | sed 's/"/\\"/g')
-        cpu=$(echo "$line" | awk '{print $3}')
-        
-        if [ $process_count -gt 0 ]; then
-            process_json+=","
-        fi
-        
-        process_json+="{\"name\":\"$name\",\"cpu\":$cpu}"
+        process_names[$process_count]=$(echo "$line" | awk '{print $11}')
+        process_cpus[$process_count]=$(echo "$line" | awk '{print $3}')
         process_count=$((process_count+1))
     else
         break
     fi
+done < <(echo "$ps_output" | tail -n +2)
+
+# Handle parameters if provided
+if [ -n "$param" ]; then
+    case "$param" in
+        top_processes_name\[*\])
+            # Extract index from parameter
+            index=$(echo "$param" | sed 's/top_processes_name\[\([0-9]\+\)\]/\1/')
+            if [ -n "${process_names[$index]}" ]; then
+                echo "${process_names[$index]}"
+            else
+                echo "Unknown"
+            fi
+            exit 0
+            ;;
+        top_processes_cpu\[*\])
+            # Extract index from parameter
+            index=$(echo "$param" | sed 's/top_processes_cpu\[\([0-9]\+\)\]/\1/')
+            if [ -n "${process_cpus[$index]}" ]; then
+                echo "${process_cpus[$index]}"
+            else
+                echo "0"
+            fi
+            exit 0
+            ;;
+    esac
+fi
+
+# If no valid parameter provided, output full JSON
+# Build JSON output
+process_json="["
+for i in $(seq 0 $((process_count-1))); do
+    if [ $i -gt 0 ]; then
+        process_json+=","
+    fi
+    process_json+="{\"name\":\"${process_names[$i]}\",\"cpu\":${process_cpus[$i]}}"
 done
 process_json+="]"
 
-# Output only the processes in simple JSON
+# Output full JSON
 echo "{
     \"top_processes\": $process_json
 }" 

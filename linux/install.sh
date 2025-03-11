@@ -133,7 +133,7 @@ fi
 
 # System htop monitoring
 if ! grep -q "UserParameter=system.htop" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=system.htop[*],/etc/zabbix/enhanced_scripts/system_htop.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
 fi
 
 # System health monitoring
