@@ -98,93 +98,66 @@ if [ -n "$ZABBIX_SERVER_IP" ] && [ -n "$HOSTNAME" ]; then
     fi
 fi
 
-# Improved function to get Zabbix server IP with better input handling
-get_valid_ip() {
-    # Try to automatically detect the server IP
-    local default_ip=""
-    if command_exists hostname; then
-        default_ip=$(hostname -I | awk '{print $1}')
+# Very simple interactive function for SSH - no fancy terminal control
+get_zabbix_input() {
+    # Get IP address
+    default_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    if [ -z "$default_ip" ]; then
+        default_ip="127.0.0.1"
     fi
     
-    while true; do
-        # Make the prompt very visible
-        echo ""
-        echo "=============================================="
-        echo "WAITING FOR INPUT: Zabbix Server IP Address"
-        echo "=============================================="
-        echo "Enter Zabbix Server IP (or press Enter for $default_ip, or type 'exit' to quit): "
-        # Read without using stty commands which can cause issues in SSH
-        read -e ip_address  # -e enables readline for line editing (allows backspace)
-        echo "You entered: \"$ip_address\""
-        
-        # Check if user wants to exit
-        if [[ "$ip_address" == "exit" ]]; then
-            echo "Installation canceled by user."
-            exit 0
-        fi
-        
-        # Use default if empty
-        if [ -z "$ip_address" ] && [ -n "$default_ip" ]; then
-            ip_address="$default_ip"
-            echo "Using default IP: $ip_address"
-        fi
-        
-        # Validate IP
-        if validate_ip "$ip_address"; then
-            echo "IP address $ip_address is valid."
-            break
-        else
-            echo "Invalid IP address format. Please enter a valid IPv4 address."
-        fi
-    done
+    echo ""
+    echo "Enter Zabbix Server IP [default: $default_ip]: "
+    read input_ip
     
-    # Return the value without echo - we don't want it to print to screen
-    echo "$ip_address"
-}
-
-# Improved function to get hostname with better input handling
-get_valid_hostname() {
-    # Try to get the current hostname as default
-    local default_hostname=""
-    if command_exists hostname; then
-        default_hostname=$(hostname)
+    # Use default if empty
+    if [ -z "$input_ip" ]; then
+        input_ip="$default_ip"
+        echo "Using default IP: $input_ip"
     fi
     
-    while true; do
-        # Make the prompt very visible
-        echo ""
-        echo "=============================================="
-        echo "WAITING FOR INPUT: Hostname for this server"
-        echo "=============================================="
-        echo "Enter Hostname for this server (or press Enter for $default_hostname, or type 'exit' to quit): "
-        # Read without using stty commands which can cause issues in SSH
-        read -e hostname  # -e enables readline for line editing
-        echo "You entered: \"$hostname\""
-        
-        # Check if user wants to exit
-        if [[ "$hostname" == "exit" ]]; then
-            echo "Installation canceled by user."
-            exit 0
-        fi
-        
-        # Use default if empty
-        if [ -z "$hostname" ] && [ -n "$default_hostname" ]; then
-            hostname="$default_hostname"
-            echo "Using default hostname: $hostname"
-            break
-        elif [ -n "$hostname" ]; then
-            echo "Using hostname: $hostname"
-            break
-        else
-            echo "Hostname cannot be empty. Please enter a valid hostname."
-        fi
+    # Validate IP
+    while ! validate_ip "$input_ip"; do
+        echo "Invalid IP address format. Please enter a valid IPv4 address: "
+        read input_ip
     done
     
-    # Return the value without echo - we don't want it to print to screen
-    echo "$hostname"
+    ZABBIX_SERVER_IP="$input_ip"
+    echo "IP address $ZABBIX_SERVER_IP is valid."
+    
+    # Get hostname
+    default_hostname=$(hostname 2>/dev/null)
+    if [ -z "$default_hostname" ]; then
+        default_hostname="zabbix-agent"
+    fi
+    
+    echo ""
+    echo "Enter Hostname for this server [default: $default_hostname]: "
+    read input_hostname
+    
+    # Use default if empty
+    if [ -z "$input_hostname" ]; then
+        input_hostname="$default_hostname"
+        echo "Using default hostname: $input_hostname"
+    fi
+    
+    HOSTNAME="$input_hostname"
+    
+    # Confirm
+    echo ""
+    echo "You have entered:"
+    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+    echo "Hostname: $HOSTNAME"
+    echo ""
+    echo "Is this correct? (y/N): "
+    read confirm
+    
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        get_zabbix_input
+    fi
 }
 
-# Ask for the Zabbix server IP and hostname with improved validation
+# Ask for the Zabbix server IP and hostname
 echo "Starting Zabbix agent configuration..."
 
 # Use environment variables if available, otherwise prompt for input
@@ -194,38 +167,12 @@ if [ $use_env_vars -eq 1 ]; then
     echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
     echo "Hostname: $HOSTNAME"
 else
-    # Store values directly without printing them to screen
-    ZABBIX_SERVER_IP=$(get_valid_ip)
-    HOSTNAME=$(get_valid_hostname)
-    
-    # Now show the entered values in the right order
-    echo ""
-    echo "You have entered:"
-    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
-    echo "Hostname: $HOSTNAME"
+    # Get values through simple interactive function
+    get_zabbix_input
 fi
 
 if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
     error "Zabbix Server IP and Hostname are required"
-fi
-
-# Confirmation before proceeding
-if [ $use_env_vars -eq 0 ]; then
-    echo ""
-    read -p "Is this correct? (y/N): " CONFIRM
-    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-        echo "Let's try again..."
-        ZABBIX_SERVER_IP=$(get_valid_ip)
-        HOSTNAME=$(get_valid_hostname)
-        echo "You have entered:"
-        echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
-        echo "Hostname: $HOSTNAME"
-        read -p "Is this correct? (y/N): " CONFIRM
-        if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-            log "Installation aborted by user"
-            exit 0
-        fi
-    fi
 fi
 
 # Check if Zabbix agent is already installed
@@ -235,11 +182,16 @@ if command_exists zabbix_agentd; then
     CURRENT_VERSION=$(zabbix_agentd -V | head -n 1 | awk '{print $3}')
     log "Current Zabbix agent version: $CURRENT_VERSION"
     
-    # Ask user if they want to reinstall
-    read -p "Zabbix agent is already installed. Do you want to reinstall? (y/N): " REINSTALL
-    if [[ ! "$REINSTALL" =~ ^[Yy]$ ]]; then
-        log "Installation aborted by user"
-        exit 0
+    # If in non-interactive mode, automatically reinstall
+    if [ $NON_INTERACTIVE -eq 1 ]; then
+        log "Non-interactive mode enabled, automatically reinstalling Zabbix agent"
+    else
+        # Ask user if they want to reinstall
+        read -p "Zabbix agent is already installed. Do you want to reinstall? (y/N): " REINSTALL
+        if [[ ! "$REINSTALL" =~ ^[Yy]$ ]]; then
+            log "Installation aborted by user"
+            exit 0
+        fi
     fi
     log "Proceeding with reinstallation..."
 fi
