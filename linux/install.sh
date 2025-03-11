@@ -57,6 +57,20 @@ validate_ip() {
     return $stat
 }
 
+# Check for environment variables first
+use_env_vars=0
+if [ -n "$ZABBIX_SERVER_IP" ] && [ -n "$HOSTNAME" ]; then
+    use_env_vars=1
+    echo "Using environment variables for configuration:"
+    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+    echo "Hostname: $HOSTNAME"
+    
+    # Validate IP from environment variable
+    if ! validate_ip "$ZABBIX_SERVER_IP"; then
+        error "Invalid IP address format in ZABBIX_SERVER_IP environment variable. Please use a valid IPv4 address."
+    fi
+fi
+
 # Improved function to get Zabbix server IP with better input handling
 get_valid_ip() {
     # Try to automatically detect the server IP
@@ -66,8 +80,17 @@ get_valid_ip() {
     fi
     
     while true; do
+        # Make the prompt very visible
+        echo ""
+        echo "=============================================="
+        echo "WAITING FOR INPUT: Zabbix Server IP Address"
+        echo "=============================================="
         echo "Enter Zabbix Server IP (or press Enter for $default_ip, or type 'exit' to quit): "
+        # Force flush the output buffer to ensure prompt is displayed
+        stty -icanon
         read -e ip_address  # -e enables readline for line editing (allows backspace)
+        stty icanon
+        echo "You entered: \"$ip_address\""
         
         # Check if user wants to exit
         if [[ "$ip_address" == "exit" ]]; then
@@ -102,8 +125,17 @@ get_valid_hostname() {
     fi
     
     while true; do
+        # Make the prompt very visible
+        echo ""
+        echo "=============================================="
+        echo "WAITING FOR INPUT: Hostname for this server"
+        echo "=============================================="
         echo "Enter Hostname for this server (or press Enter for $default_hostname, or type 'exit' to quit): "
+        # Force flush the output buffer to ensure prompt is displayed
+        stty -icanon
         read -e hostname  # -e enables readline for line editing
+        stty icanon
+        echo "You entered: \"$hostname\""
         
         # Check if user wants to exit
         if [[ "$hostname" == "exit" ]]; then
@@ -129,30 +161,41 @@ get_valid_hostname() {
 
 # Ask for the Zabbix server IP and hostname with improved validation
 echo "Starting Zabbix agent configuration..."
-ZABBIX_SERVER_IP=$(get_valid_ip)
-HOSTNAME=$(get_valid_hostname)
+
+# Use environment variables if available, otherwise prompt for input
+if [ $use_env_vars -eq 1 ]; then
+    # Variables are already set from environment
+    echo "Using pre-configured values:"
+    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+    echo "Hostname: $HOSTNAME"
+else
+    ZABBIX_SERVER_IP=$(get_valid_ip)
+    HOSTNAME=$(get_valid_hostname)
+fi
 
 if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
     error "Zabbix Server IP and Hostname are required"
 fi
 
 # Confirmation before proceeding
-echo "You have entered:"
-echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
-echo "Hostname: $HOSTNAME"
-echo ""
-read -p "Is this correct? (y/N): " CONFIRM
-if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-    echo "Let's try again..."
-    ZABBIX_SERVER_IP=$(get_valid_ip)
-    HOSTNAME=$(get_valid_hostname)
+if [ $use_env_vars -eq 0 ]; then
     echo "You have entered:"
     echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
     echo "Hostname: $HOSTNAME"
+    echo ""
     read -p "Is this correct? (y/N): " CONFIRM
     if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-        log "Installation aborted by user"
-        exit 0
+        echo "Let's try again..."
+        ZABBIX_SERVER_IP=$(get_valid_ip)
+        HOSTNAME=$(get_valid_hostname)
+        echo "You have entered:"
+        echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+        echo "Hostname: $HOSTNAME"
+        read -p "Is this correct? (y/N): " CONFIRM
+        if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+            log "Installation aborted by user"
+            exit 0
+        fi
     fi
 fi
 
