@@ -17,7 +17,7 @@ get_top_processes() {
     # Use top in batch mode to get process info
     # -b: batch mode
     # -n1: one iteration only
-    # We removed the -o %CPU option as it's not supported in all versions
+    # Use a simpler version of top that works on all Ubuntu/Debian versions
     processes=$(top -b -n1 | grep -v "^top" | grep -v "^Tasks" | grep -v "^%Cpu" | grep -v "^KiB" | grep -v "^PID" | head -10)
     
     # Format output as JSON
@@ -25,11 +25,31 @@ get_top_processes() {
     local first=true
     
     while read -r line; do
-        # Extract PID, user, CPU, memory, command
+        # Skip empty lines
+        if [ -z "$line" ]; then
+            continue
+        fi
+        
+        # Extract fields from top output - more forgiving parsing
         pid=$(echo "$line" | awk '{print $1}')
+        # Only process lines with valid PIDs (numbers only)
+        if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
+            continue
+        fi
+        
         user=$(echo "$line" | awk '{print $2}')
         cpu=$(echo "$line" | awk '{print $9}')
+        # Make sure CPU is a valid number
+        if ! [[ "$cpu" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            cpu="0.0"
+        fi
+        
         mem=$(echo "$line" | awk '{print $10}')
+        # Make sure memory is a valid number
+        if ! [[ "$mem" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            mem="0.0"
+        fi
+        
         # Get command (fields 12 and beyond)
         cmd=$(echo "$line" | awk '{$1=$2=$3=$4=$5=$6=$7=$8=$9=$10=$11=""; print $0}' | sed 's/^ *//')
         
@@ -48,11 +68,8 @@ get_top_processes() {
             result="$result,"
         fi
         
-        # Only add if we have valid data
-        if [[ -n "$pid" && "$pid" =~ ^[0-9]+$ ]]; then
-            # Add this process to the JSON array
-            result="$result{\"pid\":$pid,\"user\":\"$user\",\"cpu\":$cpu,\"memory\":$mem,\"command\":\"$cmd\"}"
-        fi
+        # Add this process to the JSON array
+        result="$result{\"pid\":$pid,\"user\":\"$user\",\"cpu\":$cpu,\"memory\":$mem,\"command\":\"$cmd\"}"
     done <<< "$processes"
     
     result="$result]"
@@ -66,7 +83,10 @@ log "Collecting top processes information"
 timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 processes=$(get_top_processes)
 
-echo "{
-    \"timestamp\": \"$timestamp\",
-    \"processes\": $processes
-}" 
+# Ensure we always have valid JSON even if there are no processes
+if [ "$processes" = "[]" ]; then
+    echo "{\"timestamp\": \"$timestamp\", \"processes\": []}"
+    exit 0
+fi
+
+echo "{\"timestamp\": \"$timestamp\", \"processes\": $processes}" 
