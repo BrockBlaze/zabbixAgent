@@ -149,10 +149,10 @@ get_zabbix_input() {
     echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
     echo "Hostname: $HOSTNAME"
     echo ""
-    echo "Is this correct? (y/N): "
+    echo "Is this correct? (Y/n): "
     read confirm
     
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
         get_zabbix_input
     fi
 }
@@ -187,8 +187,8 @@ if command_exists zabbix_agentd; then
         log "Non-interactive mode enabled, automatically reinstalling Zabbix agent"
     else
         # Ask user if they want to reinstall
-        read -p "Zabbix agent is already installed. Do you want to reinstall? (y/N): " REINSTALL
-        if [[ ! "$REINSTALL" =~ ^[Yy]$ ]]; then
+        read -p "Zabbix agent is already installed. Do you want to reinstall? (Y/n): " REINSTALL
+        if [[ "$REINSTALL" =~ ^[Nn]$ ]]; then
             log "Installation aborted by user"
             exit 0
         fi
