@@ -9,6 +9,20 @@ TARGET_DIR="/zabbixAgent/linux/scripts"
 SCRIPTS_DIR="/etc/zabbix/"
 LOG_FILE="/var/log/zabbix/install.log"
 VERSION="1.1.0"
+NON_INTERACTIVE=0
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--non-interactive)
+            NON_INTERACTIVE=1
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 # Logging function
 log() {
@@ -37,6 +51,19 @@ log "Starting Zabbix Agent installation (Version $VERSION)..."
 if ! grep -q 'Ubuntu\|Debian' /etc/os-release; then
     error "This script only supports Ubuntu/Debian systems"
 fi
+
+# Check if running in non-interactive mode
+if [ $NON_INTERACTIVE -eq 1 ]; then
+    log "Running in non-interactive mode"
+    
+    # Check for required environment variables in non-interactive mode
+    if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
+        error "In non-interactive mode, you must provide ZABBIX_SERVER_IP and HOSTNAME environment variables"
+    fi
+    
+    # Set use_env_vars to ensure we use the provided values
+    use_env_vars=1
+}
 
 # Function to validate IP address format
 validate_ip() {
@@ -86,10 +113,8 @@ get_valid_ip() {
         echo "WAITING FOR INPUT: Zabbix Server IP Address"
         echo "=============================================="
         echo "Enter Zabbix Server IP (or press Enter for $default_ip, or type 'exit' to quit): "
-        # Force flush the output buffer to ensure prompt is displayed
-        stty -icanon
+        # Read without using stty commands which can cause issues in SSH
         read -e ip_address  # -e enables readline for line editing (allows backspace)
-        stty icanon
         echo "You entered: \"$ip_address\""
         
         # Check if user wants to exit
@@ -113,6 +138,7 @@ get_valid_ip() {
         fi
     done
     
+    # Return the value without echo - we don't want it to print to screen
     echo "$ip_address"
 }
 
@@ -131,10 +157,8 @@ get_valid_hostname() {
         echo "WAITING FOR INPUT: Hostname for this server"
         echo "=============================================="
         echo "Enter Hostname for this server (or press Enter for $default_hostname, or type 'exit' to quit): "
-        # Force flush the output buffer to ensure prompt is displayed
-        stty -icanon
+        # Read without using stty commands which can cause issues in SSH
         read -e hostname  # -e enables readline for line editing
-        stty icanon
         echo "You entered: \"$hostname\""
         
         # Check if user wants to exit
@@ -156,6 +180,7 @@ get_valid_hostname() {
         fi
     done
     
+    # Return the value without echo - we don't want it to print to screen
     echo "$hostname"
 }
 
@@ -169,8 +194,15 @@ if [ $use_env_vars -eq 1 ]; then
     echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
     echo "Hostname: $HOSTNAME"
 else
+    # Store values directly without printing them to screen
     ZABBIX_SERVER_IP=$(get_valid_ip)
     HOSTNAME=$(get_valid_hostname)
+    
+    # Now show the entered values in the right order
+    echo ""
+    echo "You have entered:"
+    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+    echo "Hostname: $HOSTNAME"
 fi
 
 if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
@@ -179,9 +211,6 @@ fi
 
 # Confirmation before proceeding
 if [ $use_env_vars -eq 0 ]; then
-    echo "You have entered:"
-    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
-    echo "Hostname: $HOSTNAME"
     echo ""
     read -p "Is this correct? (y/N): " CONFIRM
     if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
@@ -280,48 +309,39 @@ if [ -f /etc/zabbix/zabbix_agentd.conf ]; then
     log "Original configuration backed up to /etc/zabbix/zabbix_agentd.conf.backup.$BACKUP_TIME"
 fi
 
-# Modify the zabbix_agentd.conf file
-log "Configuring Zabbix agent..."
+# Create a new configuration file from scratch instead of modifying the existing one
+log "Creating new Zabbix agent configuration file..."
 
-# Replace placeholders with actual values - using a more robust approach
-# First, check if the lines exist, then use a different sed approach that's more robust
+# Create a new configuration with our custom settings
+cat > /etc/zabbix/zabbix_agentd.conf << EOF
+# This is a configuration file for the Zabbix agent daemon
+# Created by the install script on $(date '+%Y-%m-%d %H:%M:%S')
 
-# Handle Server setting
-if grep -q "^Server=" /etc/zabbix/zabbix_agentd.conf; then
-    # Line exists, safe to replace it
-    sed -i "s|^Server=.*|Server=$ZABBIX_SERVER_IP|" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
-    log "Set Server IP to $ZABBIX_SERVER_IP"
-else
-    # Line doesn't exist, append it
-    echo "Server=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
-    log "Added Server IP setting to $ZABBIX_SERVER_IP"
+# IP address of Zabbix server
+Server=$ZABBIX_SERVER_IP
+
+# IP address of the server for active checks
+ServerActive=$ZABBIX_SERVER_IP
+
+# Hostname as displayed in Zabbix web interface
+Hostname=$HOSTNAME
+
+# This is a typical default configuration, feel free to adjust as needed
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+EnableRemoteCommands=1
+LogRemoteCommands=1
+Timeout=30
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+EOF
+
+# Check if the configuration file was created successfully
+if [ ! -f /etc/zabbix/zabbix_agentd.conf ]; then
+    error "Failed to create Zabbix agent configuration file"
 fi
 
-# Handle ServerActive setting
-if grep -q "^ServerActive=" /etc/zabbix/zabbix_agentd.conf; then
-    # Line exists, safe to replace it
-    sed -i "s|^ServerActive=.*|ServerActive=$ZABBIX_SERVER_IP|" /etc/zabbix/zabbix_agentd.conf || log "Note: ServerActive replacement failed"
-    log "Set ServerActive to $ZABBIX_SERVER_IP"
-else
-    # Line doesn't exist, append it
-    echo "ServerActive=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf || log "Note: ServerActive addition failed"
-    log "Added ServerActive setting to $ZABBIX_SERVER_IP"
-fi
-
-# Handle Hostname setting
-if grep -q "^Hostname=" /etc/zabbix/zabbix_agentd.conf; then
-    # Line exists, safe to replace it
-    sed -i "s|^Hostname=.*|Hostname=$HOSTNAME|" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
-    log "Set Hostname to $HOSTNAME"
-else
-    # Line doesn't exist, append it
-    echo "Hostname=$HOSTNAME" >> /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
-    log "Added Hostname setting to $HOSTNAME"
-fi
-
-# Remove any existing custom UserParameters
-log "Removing any existing custom UserParameters..."
-sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
+log "Successfully created new Zabbix agent configuration file"
 
 # Add custom UserParameters with extremely simple format
 log "Adding extremely simplified UserParameters for maximum compatibility..."
