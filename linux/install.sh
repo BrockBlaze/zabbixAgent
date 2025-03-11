@@ -194,7 +194,7 @@ add_user_parameter "login.monitoring.events" "/etc/zabbix/enhanced_scripts/login
 
 # System htop monitoring - with proper parameter support
 add_user_parameter "system.htop" "/etc/zabbix/enhanced_scripts/system_htop.sh"
-add_user_parameter "system.process[*]" "/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2"
+add_user_parameter "system.process[\*]" "/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2"
 
 # Remove the individual top process UserParameters for a cleaner approach
 if grep -q "UserParameter=system.top_process_name" /etc/zabbix/zabbix_agentd.conf; then
