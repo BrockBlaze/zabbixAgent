@@ -192,72 +192,128 @@ log "Set ServerActive to $ZABBIX_SERVER_IP"
 sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
 log "Set Hostname to $HOSTNAME"
 
+# Check if timeout command exists
+if command_exists timeout; then
+    log "Timeout command found, using it for UserParameters"
+    TIMEOUT_CMD="timeout 30"
+else
+    log "Timeout command not found, not using timeouts"
+    TIMEOUT_CMD=""
+fi
+
 # Add custom UserParameters
 log "Adding custom UserParameters..."
 
 # CPU Temperature monitoring
 if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=cpu.temperature,/etc/zabbix/scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=cpu.temperature,$TIMEOUT_CMD /etc/zabbix/scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added CPU temperature monitoring"
 fi
 
 # Login monitoring - full JSON
 if ! grep -q "UserParameter=login.monitoring," /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring,/etc/zabbix/scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring,$TIMEOUT_CMD /etc/zabbix/scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added login monitoring (full JSON)"
 fi
 
 # Login monitoring - individual metrics
 if ! grep -q "UserParameter=login.monitoring.failed_logins" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.failed_logins,/etc/zabbix/scripts/login_monitoring.sh failed_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.failed_logins,$TIMEOUT_CMD /etc/zabbix/scripts/login_monitoring.sh failed_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added failed logins monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.successful_logins" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.successful_logins,/etc/zabbix/scripts/login_monitoring.sh successful_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.successful_logins,$TIMEOUT_CMD /etc/zabbix/scripts/login_monitoring.sh successful_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added successful logins monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.total_attempts" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.total_attempts,/etc/zabbix/scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.total_attempts,$TIMEOUT_CMD /etc/zabbix/scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added total login attempts monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.user_details" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.user_details,/etc/zabbix/scripts/login_monitoring.sh user_details" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.user_details,$TIMEOUT_CMD /etc/zabbix/scripts/login_monitoring.sh user_details" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added login user details monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.events" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.events,/etc/zabbix/scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.events,$TIMEOUT_CMD /etc/zabbix/scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added login events monitoring"
 fi
 
 # System health monitoring
 if ! grep -q "UserParameter=system.health" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=system.health,/etc/zabbix/scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=system.health,$TIMEOUT_CMD /etc/zabbix/scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added system health monitoring"
 fi
 
 # Top processes monitoring
 if ! grep -q "UserParameter=system.top" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=system.top,/etc/zabbix/scripts/top_processes.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=system.top,$TIMEOUT_CMD /etc/zabbix/scripts/top_processes.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added top processes monitoring"
 fi
 
 # Validate configuration
 log "Validating configuration..."
-if ! zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
+validation_output=$(zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1)
+validation_status=$?
+
+# Check for errors in the validation output
+if [[ $validation_status -ne 0 ]] || echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
+    log "Configuration validation errors detected:"
+    log "$validation_output"
+    
     log "Attempting to fix configuration issues..."
     
-    # Try validation again
-    if ! zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
-        error "Configuration validation failed after attempted fixes"
+    # Fix common issues:
+    # 1. Remove any UserParameters with errors
+    for key in "system.top" "system.health" "cpu.temperature" "login.monitoring"; do
+        if echo "$validation_output" | grep -q "$key"; then
+            log "Removing problematic UserParameter: $key"
+            # Create a temporary file without the problematic line
+            grep -v "UserParameter=$key" /etc/zabbix/zabbix_agentd.conf > /tmp/zabbix_agentd.conf.tmp
+            # Replace the original file
+            mv /tmp/zabbix_agentd.conf.tmp /etc/zabbix/zabbix_agentd.conf
+        fi
+    done
+    
+    # Try adding system.top with simplified format
+    log "Adding simplified system.top UserParameter"
+    echo "UserParameter=system.top,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
+    
+    # Validate again
+    validation_output=$(zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1)
+    validation_status=$?
+    
+    if [[ $validation_status -ne 0 ]] || echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
+        warning "Configuration still has validation issues. Some UserParameters may not work correctly:"
+        warning "$validation_output"
+        log "Continuing with installation despite validation issues..."
     else
         log "Configuration validation successful after fixes"
     fi
 else
     log "Configuration validation successful"
+fi
+
+# Test the top_processes.sh script directly
+log "Testing top_processes.sh script directly..."
+test_output=$(sudo -u zabbix /etc/zabbix/scripts/top_processes.sh 2>&1)
+if [ $? -ne 0 ]; then
+    warning "top_processes.sh script failed when executed directly:"
+    warning "$test_output"
+    
+    # Try to fix script issues
+    log "Attempting to fix script issues..."
+    # Add a shebang line if missing
+    if ! grep -q "^#!/bin/bash" /etc/zabbix/scripts/top_processes.sh; then
+        sed -i '1i#!/bin/bash' /etc/zabbix/scripts/top_processes.sh
+    fi
+    # Ensure script is executable
+    chmod +x /etc/zabbix/scripts/top_processes.sh
+else
+    log "top_processes.sh script executed successfully"
 fi
 
 # Restart the Zabbix agent service

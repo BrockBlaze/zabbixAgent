@@ -17,8 +17,8 @@ get_top_processes() {
     # Use top in batch mode to get process info
     # -b: batch mode
     # -n1: one iteration only
-    # -o %CPU: sort by CPU usage
-    processes=$(top -b -n1 -o %CPU | head -n 17 | tail -n 10)
+    # We removed the -o %CPU option as it's not supported in all versions
+    processes=$(top -b -n1 | grep -v "^top" | grep -v "^Tasks" | grep -v "^%Cpu" | grep -v "^KiB" | grep -v "^PID" | head -10)
     
     # Format output as JSON
     local result="["
@@ -48,8 +48,11 @@ get_top_processes() {
             result="$result,"
         fi
         
-        # Add this process to the JSON array
-        result="$result{\"pid\":$pid,\"user\":\"$user\",\"cpu\":$cpu,\"memory\":$mem,\"command\":\"$cmd\"}"
+        # Only add if we have valid data
+        if [[ -n "$pid" && "$pid" =~ ^[0-9]+$ ]]; then
+            # Add this process to the JSON array
+            result="$result{\"pid\":$pid,\"user\":\"$user\",\"cpu\":$cpu,\"memory\":$mem,\"command\":\"$cmd\"}"
+        fi
     done <<< "$processes"
     
     result="$result]"
