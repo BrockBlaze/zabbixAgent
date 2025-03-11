@@ -193,15 +193,18 @@ add_user_parameter "login.monitoring.user_details" "/etc/zabbix/enhanced_scripts
 add_user_parameter "login.monitoring.events" "/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events"
 
 # System htop monitoring - with proper parameter support
-add_user_parameter "system.htop" "/etc/zabbix/enhanced_scripts/system_htop.sh"
+log "Removing any existing or corrupted system.htop and system.process entries..."
+sed -i '/UserParameter=system\.htop\[/d' /etc/zabbix/zabbix_agentd.conf
+sed -i '/UserParameter=system\.process\[/d' /etc/zabbix/zabbix_agentd.conf
+sed -i '/UserParameter=system\.htop,/d' /etc/zabbix/zabbix_agentd.conf
 
-# Add system.process parameter directly to fix the syntax issue
-if ! grep -q "^UserParameter=system.process" /etc/zabbix/zabbix_agentd.conf; then
-    log "Adding system.process parameter directly to avoid syntax issues..."
-    echo 'UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh $1 $2' >> /etc/zabbix/zabbix_agentd.conf
-else
-    log "UserParameter system.process already exists, skipping..."
-fi
+# Add system.htop parameter
+log "Adding system.htop parameter..."
+echo "UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh" >> /etc/zabbix/zabbix_agentd.conf
+
+# Add system.process parameter directly with proper quoting
+log "Adding system.process parameter directly to avoid syntax issues..."
+echo "UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2" >> /etc/zabbix/zabbix_agentd.conf
 
 # Remove the individual top process UserParameters for a cleaner approach
 if grep -q "UserParameter=system.top_process_name" /etc/zabbix/zabbix_agentd.conf; then
