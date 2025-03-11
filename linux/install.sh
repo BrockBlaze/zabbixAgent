@@ -283,15 +283,41 @@ fi
 # Modify the zabbix_agentd.conf file
 log "Configuring Zabbix agent..."
 
-# Replace placeholders with actual values
-sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
-log "Set Server IP to $ZABBIX_SERVER_IP"
+# Replace placeholders with actual values - using a more robust approach
+# First, check if the lines exist, then use a different sed approach that's more robust
 
-sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf || log "Note: ServerActive not set (line might not exist)"
-log "Set ServerActive to $ZABBIX_SERVER_IP"
+# Handle Server setting
+if grep -q "^Server=" /etc/zabbix/zabbix_agentd.conf; then
+    # Line exists, safe to replace it
+    sed -i "s|^Server=.*|Server=$ZABBIX_SERVER_IP|" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
+    log "Set Server IP to $ZABBIX_SERVER_IP"
+else
+    # Line doesn't exist, append it
+    echo "Server=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
+    log "Added Server IP setting to $ZABBIX_SERVER_IP"
+fi
 
-sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
-log "Set Hostname to $HOSTNAME"
+# Handle ServerActive setting
+if grep -q "^ServerActive=" /etc/zabbix/zabbix_agentd.conf; then
+    # Line exists, safe to replace it
+    sed -i "s|^ServerActive=.*|ServerActive=$ZABBIX_SERVER_IP|" /etc/zabbix/zabbix_agentd.conf || log "Note: ServerActive replacement failed"
+    log "Set ServerActive to $ZABBIX_SERVER_IP"
+else
+    # Line doesn't exist, append it
+    echo "ServerActive=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf || log "Note: ServerActive addition failed"
+    log "Added ServerActive setting to $ZABBIX_SERVER_IP"
+fi
+
+# Handle Hostname setting
+if grep -q "^Hostname=" /etc/zabbix/zabbix_agentd.conf; then
+    # Line exists, safe to replace it
+    sed -i "s|^Hostname=.*|Hostname=$HOSTNAME|" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
+    log "Set Hostname to $HOSTNAME"
+else
+    # Line doesn't exist, append it
+    echo "Hostname=$HOSTNAME" >> /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
+    log "Added Hostname setting to $HOSTNAME"
+fi
 
 # Remove any existing custom UserParameters
 log "Removing any existing custom UserParameters..."
