@@ -12,17 +12,17 @@ log() {
 sudo mkdir -p "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 sudo chown -R zabbix:zabbix "$(dirname $LOG_FILE)" > /dev/null 2>&1 || true
 
-# Get process information without using sudo (ps doesn't need sudo)
+# Get process information without using sudo
 ps_output=$(ps aux --sort=-%cpu | head -n 11 2>/dev/null || echo "Failed to get process list")
 
-# Initialize arrays for process names and CPU values
+# Parse parameters
+param_type="$1"
+param_index="$2"
+
+# Extract process information into arrays
 declare -a process_names
 declare -a process_cpus
 
-# Parse parameter if provided
-param="$1"
-
-# Extract process information into arrays
 process_count=0
 while read -r line; do
     if [ $process_count -lt 10 ]; then
@@ -34,24 +34,20 @@ while read -r line; do
     fi
 done < <(echo "$ps_output" | tail -n +2)
 
-# Handle parameters if provided
-if [ -n "$param" ]; then
-    case "$param" in
-        top_processes_name\[*\])
-            # Extract index from parameter
-            index=$(echo "$param" | sed 's/top_processes_name\[\([0-9]\+\)\]/\1/')
-            if [ -n "${process_names[$index]}" ]; then
-                echo "${process_names[$index]}"
+# Handle parameters
+if [ -n "$param_type" ]; then
+    case "$param_type" in
+        "name")
+            if [ -n "$param_index" ] && [ "$param_index" -lt 10 ]; then
+                echo "${process_names[$param_index]}"
             else
                 echo "Unknown"
             fi
             exit 0
             ;;
-        top_processes_cpu\[*\])
-            # Extract index from parameter
-            index=$(echo "$param" | sed 's/top_processes_cpu\[\([0-9]\+\)\]/\1/')
-            if [ -n "${process_cpus[$index]}" ]; then
-                echo "${process_cpus[$index]}"
+        "cpu")
+            if [ -n "$param_index" ] && [ "$param_index" -lt 10 ]; then
+                echo "${process_cpus[$param_index]}"
             else
                 echo "0"
             fi
@@ -60,8 +56,7 @@ if [ -n "$param" ]; then
     esac
 fi
 
-# If no valid parameter provided, output full JSON
-# Build JSON output
+# If no parameters or unrecognized parameters, output full JSON
 process_json="["
 for i in $(seq 0 $((process_count-1))); do
     if [ $i -gt 0 ]; then
@@ -71,7 +66,6 @@ for i in $(seq 0 $((process_count-1))); do
 done
 process_json+="]"
 
-# Output full JSON
 echo "{
     \"top_processes\": $process_json
 }" 
