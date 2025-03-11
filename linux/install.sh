@@ -320,6 +320,19 @@ EOF
 
 log "Added basic system parameters with custom prefix"
 
+# Now add the custom script parameters using the same format
+log "Adding custom script parameters..."
+cat >> /etc/zabbix/zabbix_agentd.conf << EOF
+
+# Custom script UserParameters
+UserParameter=custom.temperature,/etc/zabbix/scripts/cpu_temp.sh
+UserParameter=custom.processes,/etc/zabbix/scripts/top_processes.sh
+UserParameter=custom.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
+UserParameter=custom.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
+EOF
+
+log "Added custom script parameters with consistent naming"
+
 # Don't try to validate - we'll let the agent restart handle that
 # The restart code already has fallback mechanisms if parameters don't work
 
