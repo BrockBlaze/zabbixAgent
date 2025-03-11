@@ -57,16 +57,34 @@ validate_ip() {
     return $stat
 }
 
-# Ask for the Zabbix server IP with validation
+# Improved function to get Zabbix server IP with better input handling
 get_valid_ip() {
-    local ip_valid=0
-    local ip_address=""
+    # Try to automatically detect the server IP
+    local default_ip=""
+    if command_exists hostname; then
+        default_ip=$(hostname -I | awk '{print $1}')
+    fi
     
-    while [ $ip_valid -eq 0 ]; do
-        read -p "Enter Zabbix Server IP: " ip_address
+    while true; do
+        echo "Enter Zabbix Server IP (or press Enter for $default_ip, or type 'exit' to quit): "
+        read -e ip_address  # -e enables readline for line editing (allows backspace)
         
+        # Check if user wants to exit
+        if [[ "$ip_address" == "exit" ]]; then
+            echo "Installation canceled by user."
+            exit 0
+        fi
+        
+        # Use default if empty
+        if [ -z "$ip_address" ] && [ -n "$default_ip" ]; then
+            ip_address="$default_ip"
+            echo "Using default IP: $ip_address"
+        fi
+        
+        # Validate IP
         if validate_ip "$ip_address"; then
-            ip_valid=1
+            echo "IP address $ip_address is valid."
+            break
         else
             echo "Invalid IP address format. Please enter a valid IPv4 address."
         fi
@@ -75,14 +93,33 @@ get_valid_ip() {
     echo "$ip_address"
 }
 
-# Get the hostname with validation
+# Improved function to get hostname with better input handling
 get_valid_hostname() {
-    local hostname=""
+    # Try to get the current hostname as default
+    local default_hostname=""
+    if command_exists hostname; then
+        default_hostname=$(hostname)
+    fi
     
-    while [ -z "$hostname" ]; do
-        read -p "Enter Hostname (this server's name): " hostname
+    while true; do
+        echo "Enter Hostname for this server (or press Enter for $default_hostname, or type 'exit' to quit): "
+        read -e hostname  # -e enables readline for line editing
         
-        if [ -z "$hostname" ]; then
+        # Check if user wants to exit
+        if [[ "$hostname" == "exit" ]]; then
+            echo "Installation canceled by user."
+            exit 0
+        fi
+        
+        # Use default if empty
+        if [ -z "$hostname" ] && [ -n "$default_hostname" ]; then
+            hostname="$default_hostname"
+            echo "Using default hostname: $hostname"
+            break
+        elif [ -n "$hostname" ]; then
+            echo "Using hostname: $hostname"
+            break
+        else
             echo "Hostname cannot be empty. Please enter a valid hostname."
         fi
     done
@@ -90,12 +127,33 @@ get_valid_hostname() {
     echo "$hostname"
 }
 
-# Ask for the Zabbix server IP and hostname with validation
+# Ask for the Zabbix server IP and hostname with improved validation
+echo "Starting Zabbix agent configuration..."
 ZABBIX_SERVER_IP=$(get_valid_ip)
 HOSTNAME=$(get_valid_hostname)
 
 if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
     error "Zabbix Server IP and Hostname are required"
+fi
+
+# Confirmation before proceeding
+echo "You have entered:"
+echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+echo "Hostname: $HOSTNAME"
+echo ""
+read -p "Is this correct? (y/N): " CONFIRM
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Let's try again..."
+    ZABBIX_SERVER_IP=$(get_valid_ip)
+    HOSTNAME=$(get_valid_hostname)
+    echo "You have entered:"
+    echo "Zabbix Server IP: $ZABBIX_SERVER_IP"
+    echo "Hostname: $HOSTNAME"
+    read -p "Is this correct? (y/N): " CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        log "Installation aborted by user"
+        exit 0
+    fi
 fi
 
 # Check if Zabbix agent is already installed
