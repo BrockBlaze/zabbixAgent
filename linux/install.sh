@@ -226,6 +226,10 @@ mkdir -p "$SCRIPTS_DIR" || error "Failed to create the target directory"
 log "Creating scripts directory..."
 mkdir -p "${SCRIPTS_DIR}scripts" || error "Failed to create the scripts directory"
 
+# Create includes directory
+log "Creating includes directory..."
+mkdir -p "${SCRIPTS_DIR}zabbix_agentd.d" || error "Failed to create the includes directory"
+
 # Moving scripts to the target directory
 log "Moving scripts to the target directory..."
 if [ -d "$SOURCE_DIR/linux/scripts" ]; then
