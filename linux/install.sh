@@ -329,6 +329,7 @@ UserParameter=custom.temperature,/etc/zabbix/scripts/cpu_temp.sh
 UserParameter=custom.processes,/etc/zabbix/scripts/top_processes.sh
 UserParameter=custom.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
 UserParameter=custom.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
+UserParameter=custom.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
 EOF
 
 log "Added custom script parameters with consistent naming"
