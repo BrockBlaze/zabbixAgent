@@ -194,7 +194,14 @@ add_user_parameter "login.monitoring.events" "/etc/zabbix/enhanced_scripts/login
 
 # System htop monitoring - with proper parameter support
 add_user_parameter "system.htop" "/etc/zabbix/enhanced_scripts/system_htop.sh"
-add_user_parameter "system.process[\*]" "/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2"
+
+# Add system.process parameter directly to fix the syntax issue
+if ! grep -q "^UserParameter=system.process" /etc/zabbix/zabbix_agentd.conf; then
+    log "Adding system.process parameter directly to avoid syntax issues..."
+    echo 'UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh $1 $2' >> /etc/zabbix/zabbix_agentd.conf
+else
+    log "UserParameter system.process already exists, skipping..."
+fi
 
 # Remove the individual top process UserParameters for a cleaner approach
 if grep -q "UserParameter=system.top_process_name" /etc/zabbix/zabbix_agentd.conf; then
