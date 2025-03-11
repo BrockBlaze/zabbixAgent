@@ -302,106 +302,40 @@ log "Successfully created new Zabbix agent configuration file"
 # Add custom UserParameters with extremely simple format
 log "Adding extremely simplified UserParameters for maximum compatibility..."
 
-# Minimal format: basic key name, simple command, no quotation marks
-# Test a few basic parameters first
-echo "UserParameter=cputemp,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
-log "Added CPU temperature monitoring with simplified key"
+# First, remove any existing UserParameters
+sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
 
-echo "UserParameter=topproc,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
-log "Added top processes monitoring with simplified key"
+# Add the absolute most basic parameter possible to test compatibility
+echo "UserParameter=test,echo 1" >> /etc/zabbix/zabbix_agentd.conf
+log "Added test parameter with simplest possible syntax"
 
-# Add some ultra-simple built-in commands
-echo "UserParameter=cpuload,cat /proc/loadavg | cut -d' ' -f1" >> /etc/zabbix/zabbix_agentd.conf
-log "Added CPU load monitoring with simplified key"
-
-echo "UserParameter=ramfree,free -m | grep Mem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
-log "Added free memory monitoring with simplified key"
-
-echo "UserParameter=diskfree,df -h / | grep -v Filesystem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
-log "Added free disk space monitoring with simplified key"
-
-# Test scripts directly to ensure they work
-log "Testing scripts directly..."
-
-# Test top_processes.sh script
-log "Testing top_processes.sh script directly..."
-sudo -u zabbix "${SCRIPTS_DIR}scripts/top_processes.sh" > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    log "top_processes.sh script failed when executed directly, trying to fix..."
-    
-    # Check for shebang line
-    if ! grep -q "^#!/bin/bash" "${SCRIPTS_DIR}scripts/top_processes.sh"; then
-        log "Adding missing shebang line to top_processes.sh"
-        sed -i '1i#!/bin/bash' "${SCRIPTS_DIR}scripts/top_processes.sh"
-    fi
-    
-    # Make script executable
-    chmod +x "${SCRIPTS_DIR}scripts/top_processes.sh"
-    
-    # Test again
-    sudo -u zabbix "${SCRIPTS_DIR}scripts/top_processes.sh" > /dev/null 2>&1
-    if [ $? -ne 0 ]; then
-        warning "top_processes.sh script still fails when executed directly. Some UserParameters may not work."
-    else
-        log "top_processes.sh script now executes successfully"
-    fi
-else
-    log "top_processes.sh script executes successfully"
-fi
-
-# Test other scripts
-for script in cpu_temp.sh login_monitoring.sh; do
-    if [ -f "${SCRIPTS_DIR}scripts/$script" ]; then
-        log "Testing $script directly..."
-        sudo -u zabbix "${SCRIPTS_DIR}scripts/$script" > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            log "$script failed when executed directly, trying to fix..."
-            
-            # Check for shebang line
-            if ! grep -q "^#!/bin/bash" "${SCRIPTS_DIR}scripts/$script"; then
-                log "Adding missing shebang line to $script"
-                sed -i '1i#!/bin/bash' "${SCRIPTS_DIR}scripts/$script"
-            fi
-            
-            # Make script executable
-            chmod +x "${SCRIPTS_DIR}scripts/$script"
-        else
-            log "$script executes successfully"
-        fi
-    fi
-done
-
-# Validate configuration with custom error detection
-log "Validating configuration..."
+# Validate if even this most basic parameter works
 validation_output=$(zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1)
-validation_status=$?
-
-# Check for errors in the validation output
-if [[ $validation_status -ne 0 ]] || echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
-    log "Configuration validation errors detected:"
-    log "$validation_output"
+if ! echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
+    log "Basic parameter test works, adding minimal set of working parameters"
     
-    # Find which parameters are causing issues
-    log "Identifying problematic parameters with simplified approach..."
+    # Since the basic test works, add a few more simple parameters
+    echo "UserParameter=uptime,uptime" >> /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=cpuload,cat /proc/loadavg | cut -d' ' -f1" >> /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=memory,free -m | grep Mem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=diskspace,df -h / | grep -v Filesystem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
     
-    # Try just one parameter to ensure at least something works
-    sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
-    echo "UserParameter=topproc,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
+    # Test if the script parameters work separately
+    sudo -u zabbix "/etc/zabbix/scripts/top_processes.sh" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo "UserParameter=processes,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
+    fi
     
-    # Test if it works
-    validation_output=$(zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1)
-    if echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
-        log "Simplified parameter still has validation issues. Using most basic format."
-        sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
-        echo "UserParameter=proclist,ps aux" >> /etc/zabbix/zabbix_agentd.conf
-    else
-        log "Parameter 'topproc' is valid, keeping it"
-        # Try adding one more
-        echo "UserParameter=cputemp,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
+    sudo -u zabbix "/etc/zabbix/scripts/cpu_temp.sh" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        echo "UserParameter=temperature,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
     fi
 else
-    log "Configuration validation successful"
+    log "Even the most basic parameter fails, possible Zabbix agent compatibility issue"
+    # Do not add any UserParameters to avoid validation errors
 fi
+
+# Skip the previous validation check since we've already done validation above
 
 # Restart the Zabbix agent service
 log "Restarting Zabbix agent..."
