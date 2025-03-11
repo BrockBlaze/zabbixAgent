@@ -101,7 +101,7 @@ fi
 # Very simple interactive function for SSH - no fancy terminal control
 get_zabbix_input() {
     # Get IP address
-    default_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    default_ip="192.168.1.30"
     if [ -z "$default_ip" ]; then
         default_ip="127.0.0.1"
     fi
