@@ -63,7 +63,7 @@ if [ $NON_INTERACTIVE -eq 1 ]; then
     
     # Set use_env_vars to ensure we use the provided values
     use_env_vars=1
-}
+fi
 
 # Function to validate IP address format
 validate_ip() {
