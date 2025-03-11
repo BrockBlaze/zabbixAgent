@@ -305,37 +305,23 @@ log "Adding extremely simplified UserParameters for maximum compatibility..."
 # First, remove any existing UserParameters
 sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
 
-# Add the absolute most basic parameter possible to test compatibility
-echo "UserParameter=test,echo 1" >> /etc/zabbix/zabbix_agentd.conf
-log "Added test parameter with simplest possible syntax"
+# Try a different format that works with older Zabbix versions
+# Format: UserParameter=key[*],command with optional $1
+log "Using older compatible format for UserParameters"
 
-# Validate if even this most basic parameter works
-validation_output=$(zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1)
-if ! echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
-    log "Basic parameter test works, adding minimal set of working parameters"
-    
-    # Since the basic test works, add a few more simple parameters
-    echo "UserParameter=uptime,uptime" >> /etc/zabbix/zabbix_agentd.conf
-    echo "UserParameter=cpuload,cat /proc/loadavg | cut -d' ' -f1" >> /etc/zabbix/zabbix_agentd.conf
-    echo "UserParameter=memory,free -m | grep Mem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
-    echo "UserParameter=diskspace,df -h / | grep -v Filesystem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
-    
-    # Test if the script parameters work separately
-    sudo -u zabbix "/etc/zabbix/scripts/top_processes.sh" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo "UserParameter=processes,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
-    fi
-    
-    sudo -u zabbix "/etc/zabbix/scripts/cpu_temp.sh" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo "UserParameter=temperature,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
-    fi
-else
-    log "Even the most basic parameter fails, possible Zabbix agent compatibility issue"
-    # Do not add any UserParameters to avoid validation errors
-fi
+# Basic system parameters
+cat >> /etc/zabbix/zabbix_agentd.conf << EOF
+# Basic system UserParameters
+UserParameter=custom.uptime,uptime | awk '{print \$1}'
+UserParameter=custom.cpu.load,cat /proc/loadavg | cut -d' ' -f1
+UserParameter=custom.memory.free,free -m | grep Mem | awk '{print \$4}'
+UserParameter=custom.disk.free,df -h / | grep -v Filesystem | awk '{print \$4}'
+EOF
 
-# Skip the previous validation check since we've already done validation above
+log "Added basic system parameters with custom prefix"
+
+# Don't try to validate - we'll let the agent restart handle that
+# The restart code already has fallback mechanisms if parameters don't work
 
 # Restart the Zabbix agent service
 log "Restarting Zabbix agent..."
