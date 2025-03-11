@@ -5,7 +5,7 @@ REPO_URL="https://github.com/BrockBlaze/zabbixAgent.git"
 USERNAME=$(logname)
 START_DIR="/home/$USERNAME/zabbixAgent"
 SOURCE_DIR="/zabbixAgent"
-TARGET_DIR="/zabbixAgent/linux/enhanced_scripts"
+TARGET_DIR="/zabbixAgent/linux/scripts"
 SCRIPTS_DIR="/etc/zabbix/"
 LOG_FILE="/var/log/zabbix/install.log"
 VERSION="1.1.0"
@@ -123,10 +123,6 @@ log "Installing Sensors..."
 # Install lm-sensors
 apt install -y lm-sensors || error "Failed to install lm-sensors"
 
-log "Installing htop..."
-# Install htop for system monitoring
-apt install -y htop || warning "Failed to install htop, continuing anyway..."
-
 log "Automatically Detecting Sensors..."
 # Configure sensors (automatic detection)
 yes | sensors-detect || warning "Warning: sensors-detect may not have completed successfully"
@@ -146,21 +142,19 @@ mkdir -p "$SCRIPTS_DIR" || error "Failed to create the target directory"
 
 # Create scripts directory if it doesn't exist
 log "Creating scripts directory..."
-mkdir -p "${SCRIPTS_DIR}enhanced_scripts" || error "Failed to create the scripts directory"
+mkdir -p "${SCRIPTS_DIR}scripts" || error "Failed to create the scripts directory"
 
 # Moving scripts to the target directory
 log "Moving scripts to the target directory..."
-if [ -d "$SOURCE_DIR/linux/enhanced_scripts" ]; then
-    cp -r "$SOURCE_DIR"/linux/enhanced_scripts/*.sh "${SCRIPTS_DIR}enhanced_scripts/" || error "Failed to move scripts"
-elif [ -d "$SOURCE_DIR/linux/scripts" ]; then
-    cp -r "$SOURCE_DIR"/linux/scripts/*.sh "${SCRIPTS_DIR}enhanced_scripts/" || error "Failed to move scripts"
+if [ -d "$SOURCE_DIR/linux/scripts" ]; then
+    cp -r "$SOURCE_DIR"/linux/scripts/*.sh "${SCRIPTS_DIR}scripts/" || error "Failed to move scripts"
 else
     error "Could not find scripts directory in the repository"
 fi
 
 # Setting permissions
 log "Setting permissions..."
-chmod +x "${SCRIPTS_DIR}enhanced_scripts"/*.sh || error "Failed to set permissions"
+chmod +x "${SCRIPTS_DIR}scripts"/*.sh || error "Failed to set permissions"
 
 # Create dedicated log directory with proper permissions
 log "Creating log directory with proper permissions..."
@@ -172,7 +166,7 @@ log "Configuring sudo permissions for Zabbix user..."
 # Create a sudoers file for zabbix
 cat > /etc/sudoers.d/zabbix << EOF
 # Allow zabbix user to access system logs and run specific commands without password
-zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /usr/bin/htop, /usr/bin/apt-get
+zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /usr/bin/top
 Defaults:zabbix !requiretty
 EOF
 chmod 440 /etc/sudoers.d/zabbix || error "Failed to set permissions on sudoers file"
@@ -203,67 +197,58 @@ log "Adding custom UserParameters..."
 
 # CPU Temperature monitoring
 if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=cpu.temperature,/etc/zabbix/enhanced_scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=cpu.temperature,/etc/zabbix/scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added CPU temperature monitoring"
 fi
 
 # Login monitoring - full JSON
 if ! grep -q "UserParameter=login.monitoring," /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring,/etc/zabbix/enhanced_scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring,/etc/zabbix/scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added login monitoring (full JSON)"
 fi
 
 # Login monitoring - individual metrics
 if ! grep -q "UserParameter=login.monitoring.failed_logins" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.failed_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh failed_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.failed_logins,/etc/zabbix/scripts/login_monitoring.sh failed_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added failed logins monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.successful_logins" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.successful_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh successful_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.successful_logins,/etc/zabbix/scripts/login_monitoring.sh successful_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added successful logins monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.total_attempts" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.total_attempts,/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.total_attempts,/etc/zabbix/scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added total login attempts monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.user_details" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.user_details,/etc/zabbix/enhanced_scripts/login_monitoring.sh user_details" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.user_details,/etc/zabbix/scripts/login_monitoring.sh user_details" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added login user details monitoring"
 fi
 
 if ! grep -q "UserParameter=login.monitoring.events" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=login.monitoring.events,/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=login.monitoring.events,/etc/zabbix/scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added login events monitoring"
 fi
 
 # System health monitoring
 if ! grep -q "UserParameter=system.health" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=system.health,/etc/zabbix/enhanced_scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=system.health,/etc/zabbix/scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
     log "Added system health monitoring"
 fi
 
-# System htop monitoring
-if ! grep -q "UserParameter=system.htop" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
-    log "Added system htop monitoring"
-fi
-
-# System process monitoring with parameters
-if ! grep -q "UserParameter=system.process" /etc/zabbix/zabbix_agentd.conf; then
-    echo "UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2" | tee -a /etc/zabbix/zabbix_agentd.conf
-    log "Added system process monitoring"
+# Top processes monitoring
+if ! grep -q "UserParameter=system.top" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=system.top,/etc/zabbix/scripts/top_processes.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added top processes monitoring"
 fi
 
 # Validate configuration
 log "Validating configuration..."
 if ! zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
     log "Attempting to fix configuration issues..."
-    
-    # Fix the system.process UserParameter (common issue with escaping)
-    sed -i 's/UserParameter=system\.process\[\*\],\/etc\/zabbix\/enhanced_scripts\/system_htop\.sh \$1 \$2/UserParameter=system.process[*],\/etc\/zabbix\/enhanced_scripts\/system_htop.sh $1 $2/' /etc/zabbix/zabbix_agentd.conf
     
     # Try validation again
     if ! zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
@@ -315,6 +300,6 @@ echo
 echo "Zabbix Agent has been installed and configured successfully!"
 echo "Configuration file: /etc/zabbix/zabbix_agentd.conf"
 echo "Log file: $LOG_FILE"
-echo "Enhanced monitoring scripts are installed in: ${SCRIPTS_DIR}enhanced_scripts/"
+echo "Monitoring scripts are installed in: ${SCRIPTS_DIR}scripts/"
 echo
 echo "To uninstall, run: ./uninstall.sh"
