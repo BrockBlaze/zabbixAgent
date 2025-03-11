@@ -192,58 +192,30 @@ log "Set ServerActive to $ZABBIX_SERVER_IP"
 sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
 log "Set Hostname to $HOSTNAME"
 
-# Check Zabbix agent version to adjust formatting accordingly
-if command_exists zabbix_agentd; then
-    AGENT_VERSION=$(zabbix_agentd -V | head -n 1 | awk '{print $3}' | cut -d. -f1)
-    log "Detected Zabbix agent major version: $AGENT_VERSION"
-else
-    AGENT_VERSION="5"  # Default to newer format if unable to detect
-    log "Unable to detect Zabbix agent version, using default format"
-fi
-
 # Remove any existing custom UserParameters
 log "Removing any existing custom UserParameters..."
 sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
 
-# Add custom UserParameters with proper formatting
-log "Adding custom UserParameters with simple, clean output..."
+# Add custom UserParameters with extremely simple format
+log "Adding extremely simplified UserParameters for maximum compatibility..."
 
-# Check if timeout command exists
-if command_exists timeout; then
-    TIMEOUT_PREFIX="timeout 30 "
-    log "Using timeout prefix for commands"
-else
-    TIMEOUT_PREFIX=""
-    log "Not using timeout prefix (command not found)"
-fi
+# Minimal format: basic key name, simple command, no quotation marks
+# Test a few basic parameters first
+echo "UserParameter=cputemp,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
+log "Added CPU temperature monitoring with simplified key"
 
-# CPU Temperature monitoring - plain number output
-echo "UserParameter=cpu.temp,${TIMEOUT_PREFIX}/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
-log "Added CPU temperature monitoring"
+echo "UserParameter=topproc,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
+log "Added top processes monitoring with simplified key"
 
-# Login monitoring - individual metrics with simple outputs
-echo "UserParameter=login.failed,${TIMEOUT_PREFIX}/etc/zabbix/scripts/login_monitoring.sh failed_logins" >> /etc/zabbix/zabbix_agentd.conf
-log "Added failed logins monitoring"
+# Add some ultra-simple built-in commands
+echo "UserParameter=cpuload,cat /proc/loadavg | cut -d' ' -f1" >> /etc/zabbix/zabbix_agentd.conf
+log "Added CPU load monitoring with simplified key"
 
-echo "UserParameter=login.success,${TIMEOUT_PREFIX}/etc/zabbix/scripts/login_monitoring.sh successful_logins" >> /etc/zabbix/zabbix_agentd.conf
-log "Added successful logins monitoring"
+echo "UserParameter=ramfree,free -m | grep Mem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
+log "Added free memory monitoring with simplified key"
 
-echo "UserParameter=login.total,${TIMEOUT_PREFIX}/etc/zabbix/scripts/login_monitoring.sh total_attempts" >> /etc/zabbix/zabbix_agentd.conf
-log "Added total login attempts monitoring"
-
-# System health monitoring - simplify to direct commands
-echo "UserParameter=system.cpu,${TIMEOUT_PREFIX}vmstat 1 2 | tail -1 | awk '{print 100-\$15}'" >> /etc/zabbix/zabbix_agentd.conf
-log "Added CPU usage monitoring"
-
-echo "UserParameter=system.mem.free,${TIMEOUT_PREFIX}free -m | grep Mem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
-log "Added free memory monitoring"
-
-echo "UserParameter=system.disk.free[*],${TIMEOUT_PREFIX}df -h \$1 | grep -v Filesystem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
-log "Added free disk space monitoring"
-
-# Top processes monitoring - plain text tabular output
-echo "UserParameter=system.top,${TIMEOUT_PREFIX}/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
-log "Added top processes monitoring (plain text output)"
+echo "UserParameter=diskfree,df -h / | grep -v Filesystem | awk '{print \$4}'" >> /etc/zabbix/zabbix_agentd.conf
+log "Added free disk space monitoring with simplified key"
 
 # Test scripts directly to ensure they work
 log "Testing scripts directly..."
@@ -307,68 +279,22 @@ if [[ $validation_status -ne 0 ]] || echo "$validation_output" | grep -q "ZBX_NO
     log "$validation_output"
     
     # Find which parameters are causing issues
-    log "Identifying problematic parameters..."
+    log "Identifying problematic parameters with simplified approach..."
     
-    # Create a backup of the current config
-    cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.test
+    # Try just one parameter to ensure at least something works
+    sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=topproc,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
     
-    # Test each parameter individually and retain only the good ones
-    parameters=(
-        "cpu.temp"
-        "login.failed" 
-        "login.success" 
-        "login.total" 
-        "system.cpu"
-        "system.mem.free" 
-        "system.disk.free" 
-        "system.top"
-    )
-    
-    # Start with a clean config
-    grep -v "^UserParameter=" /etc/zabbix/zabbix_agentd.conf > /etc/zabbix/zabbix_agentd.conf.clean
-    mv /etc/zabbix/zabbix_agentd.conf.clean /etc/zabbix/zabbix_agentd.conf
-    
-    # Add each parameter one by one and test
-    for param in "${parameters[@]}"; do
-        log "Testing parameter: $param"
-        
-        # Extract the parameter line from the backup
-        param_line=$(grep "^UserParameter=$param" /etc/zabbix/zabbix_agentd.conf.test)
-        
-        if [ -n "$param_line" ]; then
-            # Add just this parameter
-            echo "$param_line" >> /etc/zabbix/zabbix_agentd.conf
-            
-            # Test if it works
-            if zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1 | grep -q "$param.*valid"; then
-                log "Parameter $param is valid, keeping it"
-            else
-                log "Parameter $param is invalid, removing it"
-                grep -v "^UserParameter=$param" /etc/zabbix/zabbix_agentd.conf > /etc/zabbix/zabbix_agentd.conf.clean
-                mv /etc/zabbix/zabbix_agentd.conf.clean /etc/zabbix/zabbix_agentd.conf
-            fi
-        fi
-    done
-    
-    # Remove the test backup
-    rm -f /etc/zabbix/zabbix_agentd.conf.test
-    
-    # Ensure we have at least the system.top parameter if others failed
-    if ! grep -q "^UserParameter=" /etc/zabbix/zabbix_agentd.conf; then
-        log "No valid parameters found, adding minimal configuration"
-        echo "UserParameter=system.top,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
-    fi
-    
-    # Final validation
+    # Test if it works
     validation_output=$(zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf 2>&1)
     if echo "$validation_output" | grep -q "ZBX_NOTSUPPORTED\|invalid\|failed\|error"; then
-        log "Configuration still has validation issues, using absolute minimal config"
-        # Remove all parameters and add only system.top with absolute minimal syntax
-        grep -v "^UserParameter=" /etc/zabbix/zabbix_agentd.conf > /etc/zabbix/zabbix_agentd.conf.clean
-        mv /etc/zabbix/zabbix_agentd.conf.clean /etc/zabbix/zabbix_agentd.conf
-        echo "UserParameter=system.top,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
+        log "Simplified parameter still has validation issues. Using most basic format."
+        sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
+        echo "UserParameter=proclist,ps aux" >> /etc/zabbix/zabbix_agentd.conf
     else
-        log "Configuration validation successful with selected parameters"
+        log "Parameter 'topproc' is valid, keeping it"
+        # Try adding one more
+        echo "UserParameter=cputemp,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agentd.conf
     fi
 else
     log "Configuration validation successful"
@@ -383,10 +309,10 @@ systemctl start zabbix-agent || {
     systemctl status zabbix-agent >> "$LOG_FILE" 2>&1
     journalctl -u zabbix-agent --no-pager -n 50 >> "$LOG_FILE" 2>&1
     
-    # Try one more time with minimal config
-    log "Trying with minimal configuration..."
-    sed -i '/^UserParameter/d' /etc/zabbix/zabbix_agentd.conf
-    echo "UserParameter=system.top,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agentd.conf
+    # Try one more time with absolute minimal config
+    log "Trying with absolute minimal configuration..."
+    sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agentd.conf
+    echo "UserParameter=uptime,uptime" >> /etc/zabbix/zabbix_agentd.conf
     systemctl restart zabbix-agent || error "Failed to restart Zabbix agent after multiple attempts"
 }
 
@@ -411,53 +337,43 @@ cat > /etc/zabbix/zabbix_userparameters.txt << EOF
 Zabbix Agent Custom UserParameters
 =================================
 
-The following custom UserParameters provide clean, simple output (no JSON formatting):
+The following custom UserParameters provide clean, simple output:
 
 CPU Temperature:
-- Key: cpu.temp
+- Key: cputemp
 - Command: /etc/zabbix/scripts/cpu_temp.sh
 - Description: Returns CPU temperature in Celsius as a plain number
 
-Login Monitoring:
-- Key: login.failed
-- Command: /etc/zabbix/scripts/login_monitoring.sh failed_logins
-- Description: Returns count of failed login attempts as a plain number
+CPU Load:
+- Key: cpuload
+- Command: cat /proc/loadavg | cut -d' ' -f1
+- Description: Returns the 1-minute CPU load average
 
-- Key: login.success
-- Command: /etc/zabbix/scripts/login_monitoring.sh successful_logins
-- Description: Returns count of successful logins as a plain number
-
-- Key: login.total
-- Command: /etc/zabbix/scripts/login_monitoring.sh total_attempts
-- Description: Returns total login attempts as a plain number
-
-System Health:
-- Key: system.cpu
-- Command: vmstat 1 2 | tail -1 | awk '{print 100-\$15}'
-- Description: Returns CPU usage percentage as a plain number
-
-- Key: system.mem.free
+Free Memory:
+- Key: ramfree
 - Command: free -m | grep Mem | awk '{print \$4}'
-- Description: Returns free memory in MB as a plain number
+- Description: Returns free memory in MB
 
-- Key: system.disk.free[*]
-- Command: df -h \$1 | grep -v Filesystem | awk '{print \$4}'
-- Description: Returns free disk space for specified partition
-- Usage: system.disk.free[/]
+Free Disk Space:
+- Key: diskfree
+- Command: df -h / | grep -v Filesystem | awk '{print \$4}'
+- Description: Returns free disk space on the root partition
 
 Top Processes:
-- Key: system.top
+- Key: topproc
 - Command: /etc/zabbix/scripts/top_processes.sh
 - Description: Returns top 10 processes by CPU usage in a clean tabular format
 
 Testing UserParameters:
 To test if a UserParameter is working, use:
-  zabbix_get -s 127.0.0.1 -k "parameter.name"
+  zabbix_get -s 127.0.0.1 -k "parameter_name"
 
 Example:
-  zabbix_get -s 127.0.0.1 -k "system.top"
-  zabbix_get -s 127.0.0.1 -k "cpu.temp"
+  zabbix_get -s 127.0.0.1 -k "topproc"
+  zabbix_get -s 127.0.0.1 -k "cputemp"
 
+Note: This agent has been configured with ultra-simple parameter names for
+maximum compatibility with all Zabbix agent versions.
 EOF
 
 log "UserParameters documentation created at /etc/zabbix/zabbix_userparameters.txt"
@@ -495,7 +411,7 @@ if systemctl is-active --quiet zabbix-agent; then
     echo "Enabled UserParameters (all with clean, simple output):"
     grep "^UserParameter=" /etc/zabbix/zabbix_agentd.conf | sed 's/UserParameter=/- /'
     echo
-    echo "To test a UserParameter: zabbix_get -s 127.0.0.1 -k \"parameter.name\""
+    echo "To test a UserParameter: zabbix_get -s 127.0.0.1 -k \"parameter_name\""
     echo "To uninstall, run: ./uninstall.sh"
 else
     log "Installation completed with warnings. Zabbix agent service may not be running correctly."
