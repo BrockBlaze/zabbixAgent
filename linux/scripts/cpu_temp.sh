@@ -68,5 +68,5 @@ done
 
 # If we can't get a temperature, return a specific error value that Zabbix can handle
 log "Error: Could not retrieve CPU temperature after $MAX_RETRIES attempts"
-echo "-273.15"
+echo "0"
 exit 1 

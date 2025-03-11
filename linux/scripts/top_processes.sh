@@ -20,9 +20,8 @@ get_top_processes() {
     # Use a simpler version of top that works on all Ubuntu/Debian versions
     processes=$(top -b -n1 | grep -v "^top" | grep -v "^Tasks" | grep -v "^%Cpu" | grep -v "^KiB" | grep -v "^PID" | head -10)
     
-    # Format output as JSON
-    local result="["
-    local first=true
+    # Format output as clean text
+    local result=""
     
     while read -r line; do
         # Skip empty lines
@@ -54,39 +53,19 @@ get_top_processes() {
         cmd=$(echo "$line" | awk '{$1=$2=$3=$4=$5=$6=$7=$8=$9=$10=$11=""; print $0}' | sed 's/^ *//')
         
         # Truncate command if too long
-        if [ ${#cmd} -gt 50 ]; then
-            cmd="${cmd:0:47}..."
+        if [ ${#cmd} -gt 40 ]; then
+            cmd="${cmd:0:37}..."
         fi
         
-        # Escape JSON special characters
-        cmd=$(echo "$cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')
-        
-        # Add comma if not the first item
-        if [ "$first" = true ]; then
-            first=false
-        else
-            result="$result,"
-        fi
-        
-        # Add this process to the JSON array
-        result="$result{\"pid\":$pid,\"user\":\"$user\",\"cpu\":$cpu,\"memory\":$mem,\"command\":\"$cmd\"}"
+        # Add this process to the output
+        result="${result}${pid}\t${user}\t${cpu}%\t${mem}%\t${cmd}\n"
     done <<< "$processes"
     
-    result="$result]"
-    echo "$result"
+    echo -e "PID\tUSER\tCPU%\tMEM%\tCOMMAND\n$result"
 }
 
 # Log that we're collecting information
 log "Collecting top processes information"
 
-# Format the output as JSON with timestamp
-timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-processes=$(get_top_processes)
-
-# Ensure we always have valid JSON even if there are no processes
-if [ "$processes" = "[]" ]; then
-    echo "{\"timestamp\": \"$timestamp\", \"processes\": []}"
-    exit 0
-fi
-
-echo "{\"timestamp\": \"$timestamp\", \"processes\": $processes}" 
+# Output the top processes in tabular format
+get_top_processes 
