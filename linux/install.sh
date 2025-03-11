@@ -144,77 +144,59 @@ if [ -f /etc/zabbix/zabbix_agentd.conf ]; then
     cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup.$(date +"%Y%m%d%H%M%S") || error "Failed to backup configuration"
 fi
 
-# Modify the zabbix_agentd.conf file
-log "Configuring Zabbix agent..."
+# Create a fresh main configuration file
+log "Creating a fresh main configuration file..."
+cat > /etc/zabbix/zabbix_agentd.conf << EOF
+# Basic Zabbix configuration
+Server=$ZABBIX_SERVER_IP
+ServerActive=$ZABBIX_SERVER_IP
+Hostname=$HOSTNAME
+LogFile=/var/log/zabbix/zabbix_agentd.log
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+EOF
 
-# Replace placeholders with actual values
-if grep -q "^Server=" /etc/zabbix/zabbix_agentd.conf; then
-    sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
-else
-    echo "Server=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf
-fi
+# Create include directory if it doesn't exist
+log "Setting up include directory..."
+mkdir -p /etc/zabbix/zabbix_agentd.d
 
-if grep -q "^Hostname=" /etc/zabbix/zabbix_agentd.conf; then
-    sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
-else
-    echo "Hostname=$HOSTNAME" >> /etc/zabbix/zabbix_agentd.conf
-fi
-
-# Add custom UserParameters
-log "Adding custom UserParameters..."
-
-# Function to safely add UserParameters
-add_user_parameter() {
-    local key="$1"
-    local command="$2"
-    
-    if ! grep -q "UserParameter=$key" /etc/zabbix/zabbix_agentd.conf; then
-        echo "UserParameter=$key,$command" | tee -a /etc/zabbix/zabbix_agentd.conf
-    else
-        log "UserParameter $key already exists, skipping..."
-    fi
-}
-
+# Create a file for basic non-problematic parameters
+log "Creating basic parameters file..."
+cat > /etc/zabbix/zabbix_agentd.d/basic_params.conf << EOF
 # CPU Temperature monitoring
-add_user_parameter "cpu.temperature" "/etc/zabbix/enhanced_scripts/cpu_temp.sh"
+UserParameter=cpu.temperature,/etc/zabbix/enhanced_scripts/cpu_temp.sh
 
 # Login monitoring - full JSON
-add_user_parameter "login.monitoring" "/etc/zabbix/enhanced_scripts/login_monitoring.sh"
+UserParameter=login.monitoring,/etc/zabbix/enhanced_scripts/login_monitoring.sh
 
 # Login monitoring - individual metrics
-add_user_parameter "login.monitoring.failed_logins" "/etc/zabbix/enhanced_scripts/login_monitoring.sh failed_logins"
-add_user_parameter "login.monitoring.successful_logins" "/etc/zabbix/enhanced_scripts/login_monitoring.sh successful_logins"
-add_user_parameter "login.monitoring.total_attempts" "/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts"
+UserParameter=login.monitoring.failed_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh failed_logins
+UserParameter=login.monitoring.successful_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh successful_logins
+UserParameter=login.monitoring.total_attempts,/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts
 
 # User detailed login information
-add_user_parameter "login.monitoring.user_details" "/etc/zabbix/enhanced_scripts/login_monitoring.sh user_details"
+UserParameter=login.monitoring.user_details,/etc/zabbix/enhanced_scripts/login_monitoring.sh user_details
 
 # Login events with IP addresses
-add_user_parameter "login.monitoring.events" "/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events"
-
-# System parameters - use a more robust approach
-log "Safely reconfiguring system monitoring parameters..."
-
-# Create a temporary file without any system.htop or system.process entries
-grep -v "system\.htop\|system\.process" /etc/zabbix/zabbix_agentd.conf > /tmp/zabbix_clean.conf
-
-# Add the correct entries to the temporary file
-echo "UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh" >> /tmp/zabbix_clean.conf
-echo 'UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh $1 $2' >> /tmp/zabbix_clean.conf
-
-# Replace the original file with the clean one
-cp /tmp/zabbix_clean.conf /etc/zabbix/zabbix_agentd.conf
-rm /tmp/zabbix_clean.conf
-
-# Remove the individual top process UserParameters for a cleaner approach
-if grep -q "UserParameter=system.top_process_name" /etc/zabbix/zabbix_agentd.conf; then
-    log "Removing old UserParameters..."
-    sed -i '/UserParameter=system\.top_process_name/d' /etc/zabbix/zabbix_agentd.conf
-    sed -i '/UserParameter=system\.top_process_cpu/d' /etc/zabbix/zabbix_agentd.conf
-fi
+UserParameter=login.monitoring.events,/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events
 
 # System health monitoring
-add_user_parameter "system.health" "/etc/zabbix/enhanced_scripts/system_health.sh"
+UserParameter=system.health,/etc/zabbix/enhanced_scripts/system_health.sh
+EOF
+
+# Create a separate file for the system.htop parameters
+log "Creating system monitoring parameters file..."
+cat > /etc/zabbix/zabbix_agentd.d/system_htop.conf << EOF
+# System htop monitoring
+UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh
+
+# System process monitoring with parameters
+UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2
+EOF
+
+# Set proper permissions
+log "Setting proper permissions..."
+chmod 644 /etc/zabbix/zabbix_agentd.conf
+chmod 644 /etc/zabbix/zabbix_agentd.d/*.conf
 
 # Validate configuration
 log "Validating configuration..."
