@@ -8,6 +8,7 @@ SOURCE_DIR="/zabbixAgent"
 TARGET_DIR="/zabbixAgent/linux/enhanced_scripts"
 SCRIPTS_DIR="/etc/zabbix/"
 LOG_FILE="/var/log/zabbix/install.log"
+VERSION="1.1.0"
 
 # Logging function
 log() {
@@ -19,9 +20,18 @@ error() {
     exit 1
 }
 
+warning() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1" | tee -a "$LOG_FILE"
+}
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 # Create log directory
 mkdir -p "$(dirname $LOG_FILE)"
-log "Starting Zabbix Agent installation..."
+log "Starting Zabbix Agent installation (Version $VERSION)..."
 
 # Check system compatibility
 if ! grep -q 'Ubuntu\|Debian' /etc/os-release; then
@@ -65,9 +75,6 @@ get_valid_ip() {
     echo "$ip_address"
 }
 
-# Get the server IP with validation
-ZABBIX_SERVER_IP=$(get_valid_ip)
-
 # Get the hostname with validation
 get_valid_hostname() {
     local hostname=""
@@ -83,8 +90,29 @@ get_valid_hostname() {
     echo "$hostname"
 }
 
-# Get the hostname with validation
+# Ask for the Zabbix server IP and hostname with validation
+ZABBIX_SERVER_IP=$(get_valid_ip)
 HOSTNAME=$(get_valid_hostname)
+
+if [ -z "$ZABBIX_SERVER_IP" ] || [ -z "$HOSTNAME" ]; then
+    error "Zabbix Server IP and Hostname are required"
+fi
+
+# Check if Zabbix agent is already installed
+log "Checking for existing Zabbix agent installation..."
+if command_exists zabbix_agentd; then
+    log "Zabbix agent is already installed. Checking version..."
+    CURRENT_VERSION=$(zabbix_agentd -V | head -n 1 | awk '{print $3}')
+    log "Current Zabbix agent version: $CURRENT_VERSION"
+    
+    # Ask user if they want to reinstall
+    read -p "Zabbix agent is already installed. Do you want to reinstall? (y/N): " REINSTALL
+    if [[ ! "$REINSTALL" =~ ^[Yy]$ ]]; then
+        log "Installation aborted by user"
+        exit 0
+    fi
+    log "Proceeding with reinstallation..."
+fi
 
 # Install the Zabbix agent
 log "Installing Zabbix Agent..."
@@ -97,11 +125,11 @@ apt install -y lm-sensors || error "Failed to install lm-sensors"
 
 log "Installing htop..."
 # Install htop for system monitoring
-apt install -y htop || error "Failed to install htop"
+apt install -y htop || warning "Failed to install htop, continuing anyway..."
 
 log "Automatically Detecting Sensors..."
 # Configure sensors (automatic detection)
-yes | sensors-detect || log "Warning: sensors-detect may not have completed successfully"
+yes | sensors-detect || warning "Warning: sensors-detect may not have completed successfully"
 
 # Clone the repository
 log "Cloning repository..."
@@ -109,19 +137,30 @@ if [ -d "$SOURCE_DIR" ]; then
     log "Source directory already exists, removing it first..."
     rm -rf "$SOURCE_DIR"
 fi
+
 git clone "$REPO_URL" "$SOURCE_DIR" || error "Failed to clone repository"
 
 # Ensuring the target directory exists
 log "Ensuring the target directory exists..."
-mkdir -p "$SCRIPTS_DIR/enhanced_scripts" || error "Failed to create the target directory"
+mkdir -p "$SCRIPTS_DIR" || error "Failed to create the target directory"
+
+# Create scripts directory if it doesn't exist
+log "Creating scripts directory..."
+mkdir -p "${SCRIPTS_DIR}enhanced_scripts" || error "Failed to create the scripts directory"
 
 # Moving scripts to the target directory
 log "Moving scripts to the target directory..."
-cp -r "$TARGET_DIR"/* "$SCRIPTS_DIR/enhanced_scripts/" || error "Failed to move scripts"
+if [ -d "$SOURCE_DIR/linux/enhanced_scripts" ]; then
+    cp -r "$SOURCE_DIR"/linux/enhanced_scripts/*.sh "${SCRIPTS_DIR}enhanced_scripts/" || error "Failed to move scripts"
+elif [ -d "$SOURCE_DIR/linux/scripts" ]; then
+    cp -r "$SOURCE_DIR"/linux/scripts/*.sh "${SCRIPTS_DIR}enhanced_scripts/" || error "Failed to move scripts"
+else
+    error "Could not find scripts directory in the repository"
+fi
 
 # Setting permissions
 log "Setting permissions..."
-chmod +x "$SCRIPTS_DIR"/enhanced_scripts/*.sh || error "Failed to set permissions"
+chmod +x "${SCRIPTS_DIR}enhanced_scripts"/*.sh || error "Failed to set permissions"
 
 # Create dedicated log directory with proper permissions
 log "Creating log directory with proper permissions..."
@@ -141,62 +180,82 @@ chmod 440 /etc/sudoers.d/zabbix || error "Failed to set permissions on sudoers f
 # Backup the original configuration file
 log "Backing up original configuration..."
 if [ -f /etc/zabbix/zabbix_agentd.conf ]; then
-    cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup.$(date +"%Y%m%d%H%M%S") || error "Failed to backup configuration"
+    BACKUP_TIME=$(date +"%Y%m%d%H%M%S")
+    cp /etc/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf.backup.$BACKUP_TIME || error "Failed to backup configuration"
+    log "Original configuration backed up to /etc/zabbix/zabbix_agentd.conf.backup.$BACKUP_TIME"
 fi
 
-# Create a fresh main configuration file
-log "Creating a fresh main configuration file..."
-cat > /etc/zabbix/zabbix_agentd.conf << EOF
-# Basic Zabbix configuration
-Server=$ZABBIX_SERVER_IP
-ServerActive=$ZABBIX_SERVER_IP
-Hostname=$HOSTNAME
-LogFile=/var/log/zabbix/zabbix_agentd.log
-Include=/etc/zabbix/zabbix_agentd.d/*.conf
-EOF
+# Modify the zabbix_agentd.conf file
+log "Configuring Zabbix agent..."
 
-# Create include directory if it doesn't exist
-log "Setting up include directory..."
-mkdir -p /etc/zabbix/zabbix_agentd.d
+# Replace placeholders with actual values
+sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Server IP"
+log "Set Server IP to $ZABBIX_SERVER_IP"
 
-# Create a file for basic non-problematic parameters
-log "Creating basic parameters file..."
-cat > /etc/zabbix/zabbix_agentd.d/basic_params.conf << EOF
+sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf || log "Note: ServerActive not set (line might not exist)"
+log "Set ServerActive to $ZABBIX_SERVER_IP"
+
+sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf || error "Failed to set Hostname"
+log "Set Hostname to $HOSTNAME"
+
+# Add custom UserParameters
+log "Adding custom UserParameters..."
+
 # CPU Temperature monitoring
-UserParameter=cpu.temperature,/etc/zabbix/enhanced_scripts/cpu_temp.sh
+if ! grep -q "UserParameter=cpu.temperature" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=cpu.temperature,/etc/zabbix/enhanced_scripts/cpu_temp.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added CPU temperature monitoring"
+fi
 
 # Login monitoring - full JSON
-UserParameter=login.monitoring,/etc/zabbix/enhanced_scripts/login_monitoring.sh
+if ! grep -q "UserParameter=login.monitoring," /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring,/etc/zabbix/enhanced_scripts/login_monitoring.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added login monitoring (full JSON)"
+fi
 
 # Login monitoring - individual metrics
-UserParameter=login.monitoring.failed_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh failed_logins
-UserParameter=login.monitoring.successful_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh successful_logins
-UserParameter=login.monitoring.total_attempts,/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts
+if ! grep -q "UserParameter=login.monitoring.failed_logins" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.failed_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh failed_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added failed logins monitoring"
+fi
 
-# User detailed login information
-UserParameter=login.monitoring.user_details,/etc/zabbix/enhanced_scripts/login_monitoring.sh user_details
+if ! grep -q "UserParameter=login.monitoring.successful_logins" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.successful_logins,/etc/zabbix/enhanced_scripts/login_monitoring.sh successful_logins" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added successful logins monitoring"
+fi
 
-# Login events with IP addresses
-UserParameter=login.monitoring.events,/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events
+if ! grep -q "UserParameter=login.monitoring.total_attempts" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.total_attempts,/etc/zabbix/enhanced_scripts/login_monitoring.sh total_attempts" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added total login attempts monitoring"
+fi
+
+if ! grep -q "UserParameter=login.monitoring.user_details" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.user_details,/etc/zabbix/enhanced_scripts/login_monitoring.sh user_details" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added login user details monitoring"
+fi
+
+if ! grep -q "UserParameter=login.monitoring.events" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=login.monitoring.events,/etc/zabbix/enhanced_scripts/login_monitoring.sh login_events" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added login events monitoring"
+fi
 
 # System health monitoring
-UserParameter=system.health,/etc/zabbix/enhanced_scripts/system_health.sh
-EOF
+if ! grep -q "UserParameter=system.health" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=system.health,/etc/zabbix/enhanced_scripts/system_health.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added system health monitoring"
+fi
 
-# Create a separate file for the system.htop parameters
-log "Creating system monitoring parameters file..."
-cat > /etc/zabbix/zabbix_agentd.d/system_htop.conf << EOF
 # System htop monitoring
-UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh
+if ! grep -q "UserParameter=system.htop" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=system.htop,/etc/zabbix/enhanced_scripts/system_htop.sh" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added system htop monitoring"
+fi
 
 # System process monitoring with parameters
-UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2
-EOF
-
-# Set proper permissions
-log "Setting proper permissions..."
-chmod 644 /etc/zabbix/zabbix_agentd.conf
-chmod 644 /etc/zabbix/zabbix_agentd.d/*.conf
+if ! grep -q "UserParameter=system.process" /etc/zabbix/zabbix_agentd.conf; then
+    echo "UserParameter=system.process[*],/etc/zabbix/enhanced_scripts/system_htop.sh \$1 \$2" | tee -a /etc/zabbix/zabbix_agentd.conf
+    log "Added system process monitoring"
+fi
 
 # Validate configuration
 log "Validating configuration..."
@@ -214,22 +273,34 @@ systemctl enable zabbix-agent || error "Failed to enable Zabbix agent"
 log "Verifying service status..."
 if ! systemctl is-active --quiet zabbix-agent; then
     error "Zabbix agent service is not running"
+else
+    log "Zabbix agent service is running correctly"
+fi
+
+# Verify connection to Zabbix server
+log "Verifying connection to Zabbix server..."
+if command_exists nc; then
+    if nc -z -w5 "$ZABBIX_SERVER_IP" 10050 >/dev/null 2>&1; then
+        log "Successfully connected to Zabbix server at $ZABBIX_SERVER_IP:10050"
+    else
+        warning "Could not connect to Zabbix server at $ZABBIX_SERVER_IP:10050"
+    fi
+else
+    log "nc command not available, skipping server connection check"
 fi
 
 # Clean up
 log "Cleaning up..."
-rm -rf "$SOURCE_DIR" || log "Warning: Failed to remove source directory"
+rm -rf "$SOURCE_DIR" || warning "Warning: Failed to remove source directory"
 if [ -d "$START_DIR" ]; then
-    rm -rf "$START_DIR" || log "Warning: Failed to remove start directory"
+    rm -rf "$START_DIR" || warning "Warning: Failed to remove start directory"
 fi
 
 log "Installation completed successfully!"
-cd ~
 echo
 echo "Zabbix Agent has been installed and configured successfully!"
 echo "Configuration file: /etc/zabbix/zabbix_agentd.conf"
 echo "Log file: $LOG_FILE"
-echo "Enhanced monitoring scripts are installed in: $SCRIPTS_DIR/enhanced_scripts/"
+echo "Enhanced monitoring scripts are installed in: ${SCRIPTS_DIR}enhanced_scripts/"
 echo
 echo "To uninstall, run: ./uninstall.sh"
-
