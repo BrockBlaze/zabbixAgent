@@ -259,7 +259,21 @@ fi
 
 # Validate configuration
 log "Validating configuration..."
-zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf || error "Configuration validation failed"
+if ! zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
+    log "Attempting to fix configuration issues..."
+    
+    # Fix the system.process UserParameter (common issue with escaping)
+    sed -i 's/UserParameter=system\.process\[\*\],\/etc\/zabbix\/enhanced_scripts\/system_htop\.sh \$1 \$2/UserParameter=system.process[*],\/etc\/zabbix\/enhanced_scripts\/system_htop.sh $1 $2/' /etc/zabbix/zabbix_agentd.conf
+    
+    # Try validation again
+    if ! zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
+        error "Configuration validation failed after attempted fixes"
+    else
+        log "Configuration validation successful after fixes"
+    fi
+else
+    log "Configuration validation successful"
+fi
 
 # Restart the Zabbix agent service
 log "Restarting Zabbix agent..."
