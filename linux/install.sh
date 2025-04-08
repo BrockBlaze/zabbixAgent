@@ -48,14 +48,18 @@ apt update || { echo "Failed to update package list" >&2; exit 1; }
 echo "Installing required packages..." | tee -a "$LOG_FILE"
 apt install -y zabbix-agent2 lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
 
-# Configure sensors
+# Configure sensors (with error handling)
 echo "Configuring sensors..." | tee -a "$LOG_FILE"
-yes | sensors-detect || echo "Warning: sensors-detect may not have completed successfully" | tee -a "$LOG_FILE"
+if command -v sensors-detect >/dev/null 2>&1; then
+    yes | sensors-detect >/dev/null 2>&1 || echo "Warning: sensors-detect may not have completed successfully" | tee -a "$LOG_FILE"
+else
+    echo "Warning: sensors-detect not found, skipping sensor configuration" | tee -a "$LOG_FILE"
+fi
 
 # Create necessary directories
 echo "Creating required directories..." | tee -a "$LOG_FILE"
 mkdir -p /etc/zabbix/scripts || { echo "Failed to create scripts directory" >&2; exit 1; }
-mkdir -p /etc/zabbix/zabbix_agentd.d || { echo "Failed to create agentd.d directory" >&2; exit 1; }
+mkdir -p /etc/zabbix/zabbix_agent2.d || { echo "Failed to create agent2.d directory" >&2; exit 1; }
 mkdir -p /var/log/zabbix || { echo "Failed to create log directory" >&2; exit 1; }
 
 # Copy monitoring scripts
@@ -95,6 +99,10 @@ UserParameter=custom.login.successful,/etc/zabbix/scripts/login_monitoring.sh su
 UserParameter=custom.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
 EOF
 
+# Set proper permissions on configuration file
+chown zabbix:zabbix /etc/zabbix/zabbix_agent2.conf
+chmod 640 /etc/zabbix/zabbix_agent2.conf
+
 # Configure sudo permissions for Zabbix user
 echo "Configuring sudo permissions..." | tee -a "$LOG_FILE"
 cat > /etc/sudoers.d/zabbix << EOF
@@ -103,9 +111,18 @@ Defaults:zabbix !requiretty
 EOF
 chmod 440 /etc/sudoers.d/zabbix || { echo "Failed to set sudo permissions" >&2; exit 1; }
 
+# Create log directory with proper permissions
+chown -R zabbix:zabbix /var/log/zabbix
+chmod 755 /var/log/zabbix
+
 # Restart Zabbix agent
 echo "Restarting Zabbix agent..." | tee -a "$LOG_FILE"
-systemctl restart zabbix-agent2 || { echo "Failed to restart zabbix-agent2" >&2; exit 1; }
+systemctl daemon-reload
+systemctl restart zabbix-agent2 || { 
+    echo "Failed to restart zabbix-agent2, checking logs..." | tee -a "$LOG_FILE"
+    journalctl -u zabbix-agent2 --no-pager -n 50 | tee -a "$LOG_FILE"
+    exit 1
+}
 systemctl enable zabbix-agent2 || { echo "Failed to enable zabbix-agent2" >&2; exit 1; }
 
 # Verify installation
@@ -122,5 +139,6 @@ else
     echo "Installation completed with warnings. Zabbix agent service may not be running correctly." | tee -a "$LOG_FILE"
     echo "Please check the log file for details: $LOG_FILE"
     echo "Try running: systemctl status zabbix-agent2"
+    echo "Check logs with: journalctl -u zabbix-agent2"
     exit 1
 fi
