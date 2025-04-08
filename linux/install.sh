@@ -34,10 +34,19 @@ if [ -z "$HOSTNAME" ]; then
     HOSTNAME=$(hostname)
 fi
 
+# Add Zabbix repository
+echo "Adding Zabbix repository..." | tee -a "$LOG_FILE"
+wget https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
+dpkg -i zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
+rm zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb
+
+# Update package list
+echo "Updating package list..." | tee -a "$LOG_FILE"
+apt update || { echo "Failed to update package list" >&2; exit 1; }
+
 # Install required packages
 echo "Installing required packages..." | tee -a "$LOG_FILE"
-apt update || { echo "Failed to update package list" >&2; exit 1; }
-apt install -y zabbix-agent lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
+apt install -y zabbix-agent2 lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
 
 # Configure sensors
 echo "Configuring sensors..." | tee -a "$LOG_FILE"
@@ -60,17 +69,17 @@ chmod +x /etc/zabbix/scripts/*.sh || { echo "Failed to set script permissions" >
 
 # Create Zabbix agent configuration
 echo "Creating Zabbix agent configuration..." | tee -a "$LOG_FILE"
-cat > /etc/zabbix/zabbix_agentd.conf << EOF
+cat > /etc/zabbix/zabbix_agent2.conf << EOF
 Server=$ZABBIX_SERVER_IP
 ServerActive=$ZABBIX_SERVER_IP
 Hostname=$HOSTNAME
-PidFile=/var/run/zabbix/zabbix_agentd.pid
-LogFile=/var/log/zabbix/zabbix_agentd.log
+PidFile=/var/run/zabbix/zabbix_agent2.pid
+LogFile=/var/log/zabbix/zabbix_agent2.log
 LogFileSize=0
 EnableRemoteCommands=1
 LogRemoteCommands=1
 Timeout=30
-Include=/etc/zabbix/zabbix_agentd.d/*.conf
+Include=/etc/zabbix/zabbix_agent2.d/*.conf
 
 # Basic system parameters
 UserParameter=custom.uptime,uptime | awk '{print \$1}'
@@ -96,15 +105,15 @@ chmod 440 /etc/sudoers.d/zabbix || { echo "Failed to set sudo permissions" >&2; 
 
 # Restart Zabbix agent
 echo "Restarting Zabbix agent..." | tee -a "$LOG_FILE"
-systemctl restart zabbix-agent || { echo "Failed to restart zabbix-agent" >&2; exit 1; }
-systemctl enable zabbix-agent || { echo "Failed to enable zabbix-agent" >&2; exit 1; }
+systemctl restart zabbix-agent2 || { echo "Failed to restart zabbix-agent2" >&2; exit 1; }
+systemctl enable zabbix-agent2 || { echo "Failed to enable zabbix-agent2" >&2; exit 1; }
 
 # Verify installation
-if systemctl is-active --quiet zabbix-agent; then
+if systemctl is-active --quiet zabbix-agent2; then
     echo "Installation completed successfully!" | tee -a "$LOG_FILE"
     echo
     echo "Zabbix Agent has been installed and configured successfully!"
-    echo "Configuration file: /etc/zabbix/zabbix_agentd.conf"
+    echo "Configuration file: /etc/zabbix/zabbix_agent2.conf"
     echo "Log file: $LOG_FILE"
     echo "Monitoring scripts are installed in: /etc/zabbix/scripts/"
     echo
@@ -112,6 +121,6 @@ if systemctl is-active --quiet zabbix-agent; then
 else
     echo "Installation completed with warnings. Zabbix agent service may not be running correctly." | tee -a "$LOG_FILE"
     echo "Please check the log file for details: $LOG_FILE"
-    echo "Try running: systemctl status zabbix-agent"
+    echo "Try running: systemctl status zabbix-agent2"
     exit 1
 fi
