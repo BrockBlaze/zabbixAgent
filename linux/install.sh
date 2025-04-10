@@ -117,12 +117,6 @@ fi
 # Create UserParameters file if it doesn't exist
 if [ ! -f /etc/zabbix/zabbix_agent2.d/userparameters.conf ]; then
     cat > /etc/zabbix/zabbix_agent2.d/userparameters.conf << EOF
-# Basic system parameters
-UserParameter=system.uptime,uptime | awk '{print \$1}'
-UserParameter=system.cpu.load,cat /proc/loadavg | cut -d' ' -f1
-UserParameter=system.memory.free,free -m | grep Mem | awk '{print \$4}'
-UserParameter=system.disk.free,df -h / | grep -v Filesystem | awk '{print \$4}'
-
 # Custom script parameters
 UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh
 UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh
