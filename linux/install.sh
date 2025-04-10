@@ -88,18 +88,34 @@ Timeout=30
 Include=/etc/zabbix/zabbix_agent2.d/*.conf
 EOF
 else
-    # Update existing configuration
-    sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
-    sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
-    sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agent2.conf
+    # Only update specific lines if they exist, otherwise append them
+    if ! grep -q "^Server=" /etc/zabbix/zabbix_agent2.conf; then
+        echo "Server=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agent2.conf
+    else
+        sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
+    fi
+
+    if ! grep -q "^ServerActive=" /etc/zabbix/zabbix_agent2.conf; then
+        echo "ServerActive=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agent2.conf
+    else
+        sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
+    fi
+
+    if ! grep -q "^Hostname=" /etc/zabbix/zabbix_agent2.conf; then
+        echo "Hostname=$HOSTNAME" >> /etc/zabbix/zabbix_agent2.conf
+    else
+        sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agent2.conf
+    fi
+
+    # Ensure Include directive exists
+    if ! grep -q "^Include=" /etc/zabbix/zabbix_agent2.conf; then
+        echo "Include=/etc/zabbix/zabbix_agent2.d/*.conf" >> /etc/zabbix/zabbix_agent2.conf
+    fi
 fi
 
-# Remove existing UserParameters
-sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agent2.conf
-
-# Append UserParameters
-cat >> /etc/zabbix/zabbix_agent2.conf << EOF
-
+# Create UserParameters file if it doesn't exist
+if [ ! -f /etc/zabbix/zabbix_agent2.d/userparameters.conf ]; then
+    cat > /etc/zabbix/zabbix_agent2.d/userparameters.conf << EOF
 # Basic system parameters
 UserParameter=system.uptime,uptime | awk '{print \$1}'
 UserParameter=system.cpu.load,cat /proc/loadavg | cut -d' ' -f1
@@ -113,10 +129,13 @@ UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed
 UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
 UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
 EOF
+fi
 
-# Set proper permissions on configuration file
+# Set proper permissions on configuration files
 chown zabbix:zabbix /etc/zabbix/zabbix_agent2.conf
 chmod 640 /etc/zabbix/zabbix_agent2.conf
+chown zabbix:zabbix /etc/zabbix/zabbix_agent2.d/userparameters.conf
+chmod 640 /etc/zabbix/zabbix_agent2.d/userparameters.conf
 
 # Configure sudo permissions for Zabbix user
 echo "Configuring sudo permissions..." | tee -a "$LOG_FILE"
