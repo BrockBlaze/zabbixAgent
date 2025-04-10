@@ -61,6 +61,7 @@ echo "Creating required directories..." | tee -a "$LOG_FILE"
 mkdir -p /etc/zabbix/scripts || { echo "Failed to create scripts directory" >&2; exit 1; }
 mkdir -p /etc/zabbix/zabbix_agent2.d || { echo "Failed to create agent2.d directory" >&2; exit 1; }
 mkdir -p /var/log/zabbix || { echo "Failed to create log directory" >&2; exit 1; }
+mkdir -p /var/run/zabbix || { echo "Failed to create run directory" >&2; exit 1; }
 
 # Copy monitoring scripts
 echo "Installing monitoring scripts..." | tee -a "$LOG_FILE"
@@ -111,15 +112,29 @@ Defaults:zabbix !requiretty
 EOF
 chmod 440 /etc/sudoers.d/zabbix || { echo "Failed to set sudo permissions" >&2; exit 1; }
 
-# Create log directory with proper permissions
+# Set proper permissions on directories
+echo "Setting directory permissions..." | tee -a "$LOG_FILE"
 chown -R zabbix:zabbix /var/log/zabbix
 chmod 755 /var/log/zabbix
+chown -R zabbix:zabbix /var/run/zabbix
+chmod 755 /var/run/zabbix
+chown -R zabbix:zabbix /etc/zabbix/scripts
+chmod 755 /etc/zabbix/scripts
+
+# Test configuration before starting service
+echo "Testing configuration..." | tee -a "$LOG_FILE"
+if ! sudo -u zabbix zabbix_agent2 -t /etc/zabbix/zabbix_agent2.conf; then
+    echo "Configuration test failed. Please check the configuration file." | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 # Restart Zabbix agent
 echo "Restarting Zabbix agent..." | tee -a "$LOG_FILE"
 systemctl daemon-reload
-systemctl restart zabbix-agent2 || { 
-    echo "Failed to restart zabbix-agent2, checking logs..." | tee -a "$LOG_FILE"
+systemctl stop zabbix-agent2 2>/dev/null
+sleep 2
+systemctl start zabbix-agent2 || { 
+    echo "Failed to start zabbix-agent2, checking logs..." | tee -a "$LOG_FILE"
     journalctl -u zabbix-agent2 --no-pager -n 50 | tee -a "$LOG_FILE"
     exit 1
 }
