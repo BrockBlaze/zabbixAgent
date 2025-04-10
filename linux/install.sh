@@ -44,6 +44,10 @@ rm zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb
 echo "Updating package list..." | tee -a "$LOG_FILE"
 apt update || { echo "Failed to update package list" >&2; exit 1; }
 
+# Update package list again to ensure Zabbix repository is included
+echo "Updating package list with Zabbix repository..." | tee -a "$LOG_FILE"
+apt update || { echo "Failed to update package list with Zabbix repository" >&2; exit 1; }
+
 # Install required packages
 echo "Installing required packages..." | tee -a "$LOG_FILE"
 apt install -y zabbix-agent2 lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
