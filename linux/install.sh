@@ -87,17 +87,17 @@ Timeout=30
 Include=/etc/zabbix/zabbix_agent2.d/*.conf
 
 # Basic system parameters
-UserParameter=custom.uptime,uptime | awk '{print \$1}'
-UserParameter=custom.cpu.load,cat /proc/loadavg | cut -d' ' -f1
-UserParameter=custom.memory.free,free -m | grep Mem | awk '{print \$4}'
-UserParameter=custom.disk.free,df -h / | grep -v Filesystem | awk '{print \$4}'
+UserParameter=system.uptime,uptime | awk '{print \$1}'
+UserParameter=system.cpu.load,cat /proc/loadavg | cut -d' ' -f1
+UserParameter=system.memory.free,free -m | grep Mem | awk '{print \$4}'
+UserParameter=system.disk.free,df -h / | grep -v Filesystem | awk '{print \$4}'
 
 # Custom script parameters
-UserParameter=custom.temperature,/etc/zabbix/scripts/cpu_temp.sh
-UserParameter=custom.processes,/etc/zabbix/scripts/top_processes.sh
-UserParameter=custom.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
-UserParameter=custom.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
-UserParameter=custom.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
+UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh
+UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh
+UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
+UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
+UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
 EOF
 
 # Set proper permissions on configuration file
