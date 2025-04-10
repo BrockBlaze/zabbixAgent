@@ -8,7 +8,7 @@ fi
 
 # Basic configuration
 LOG_FILE="/var/log/zabbix/install.log"
-VERSION="1.1.0"
+VERSION="2.0.1"
 
 # Create log directory and start logging
 mkdir -p "$(dirname $LOG_FILE)" || { echo "Failed to create log directory" >&2; exit 1; }
@@ -38,15 +38,12 @@ fi
 echo "Adding Zabbix repository..." | tee -a "$LOG_FILE"
 wget https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
 dpkg -i zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
-rm zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb
+# rm zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb
 
 # Update package list
 echo "Updating package list..." | tee -a "$LOG_FILE"
 apt update || { echo "Failed to update package list" >&2; exit 1; }
 
-# Update package list again to ensure Zabbix repository is included
-echo "Updating package list with Zabbix repository..." | tee -a "$LOG_FILE"
-apt update || { echo "Failed to update package list with Zabbix repository" >&2; exit 1; }
 
 # Install required packages
 echo "Installing required packages..." | tee -a "$LOG_FILE"
