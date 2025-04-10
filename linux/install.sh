@@ -74,7 +74,8 @@ chmod +x /etc/zabbix/scripts/*.sh || { echo "Failed to set script permissions" >
 
 # Create Zabbix agent configuration
 echo "Creating Zabbix agent configuration..." | tee -a "$LOG_FILE"
-cat > /etc/zabbix/zabbix_agent2.conf << EOF
+if [ ! -f /etc/zabbix/zabbix_agent2.conf ]; then
+    cat > /etc/zabbix/zabbix_agent2.conf << EOF
 Server=$ZABBIX_SERVER_IP
 ServerActive=$ZABBIX_SERVER_IP
 Hostname=$HOSTNAME
@@ -85,6 +86,19 @@ EnableRemoteCommands=1
 LogRemoteCommands=1
 Timeout=30
 Include=/etc/zabbix/zabbix_agent2.d/*.conf
+EOF
+else
+    # Update existing configuration
+    sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
+    sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
+    sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agent2.conf
+fi
+
+# Remove existing UserParameters
+sed -i '/^UserParameter=/d' /etc/zabbix/zabbix_agent2.conf
+
+# Append UserParameters
+cat >> /etc/zabbix/zabbix_agent2.conf << EOF
 
 # Basic system parameters
 UserParameter=system.uptime,uptime | awk '{print \$1}'
