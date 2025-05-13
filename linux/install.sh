@@ -44,10 +44,9 @@ dpkg -i zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed 
 echo "Updating package list..." | tee -a "$LOG_FILE"
 apt update || { echo "Failed to update package list" >&2; exit 1; }
 
-
 # Install required packages
 echo "Installing required packages..." | tee -a "$LOG_FILE"
-apt install -y zabbix-agent2 lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
+apt install -y zabbix-agent lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
 
 # Configure sensors (with error handling)
 echo "Configuring sensors..." | tee -a "$LOG_FILE"
@@ -60,7 +59,7 @@ fi
 # Create necessary directories
 echo "Creating required directories..." | tee -a "$LOG_FILE"
 mkdir -p /etc/zabbix/scripts || { echo "Failed to create scripts directory" >&2; exit 1; }
-mkdir -p /etc/zabbix/zabbix_agent2.d || { echo "Failed to create agent2.d directory" >&2; exit 1; }
+mkdir -p /etc/zabbix/zabbix_agentd.d || { echo "Failed to create agentd.d directory" >&2; exit 1; }
 mkdir -p /var/log/zabbix || { echo "Failed to create log directory" >&2; exit 1; }
 mkdir -p /var/run/zabbix || { echo "Failed to create run directory" >&2; exit 1; }
 
@@ -75,48 +74,48 @@ chmod +x /etc/zabbix/scripts/*.sh || { echo "Failed to set script permissions" >
 
 # Create Zabbix agent configuration
 echo "Creating Zabbix agent configuration..." | tee -a "$LOG_FILE"
-if [ ! -f /etc/zabbix/zabbix_agent2.conf ]; then
-    cat > /etc/zabbix/zabbix_agent2.conf << EOF
+if [ ! -f /etc/zabbix/zabbix_agentd.conf ]; then
+    cat > /etc/zabbix/zabbix_agentd.conf << EOF
 Server=$ZABBIX_SERVER_IP
 ServerActive=$ZABBIX_SERVER_IP
 Hostname=$HOSTNAME
-PidFile=/var/run/zabbix/zabbix_agent2.pid
-LogFile=/var/log/zabbix/zabbix_agent2.log
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
 LogFileSize=0
 EnableRemoteCommands=1
 LogRemoteCommands=1
 Timeout=30
-Include=/etc/zabbix/zabbix_agent2.d/*.conf
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
 EOF
 else
     # Only update specific lines if they exist, otherwise append them
-    if ! grep -q "^Server=" /etc/zabbix/zabbix_agent2.conf; then
-        echo "Server=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agent2.conf
+    if ! grep -q "^Server=" /etc/zabbix/zabbix_agentd.conf; then
+        echo "Server=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf
     else
-        sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
+        sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf
     fi
 
-    if ! grep -q "^ServerActive=" /etc/zabbix/zabbix_agent2.conf; then
-        echo "ServerActive=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agent2.conf
+    if ! grep -q "^ServerActive=" /etc/zabbix/zabbix_agentd.conf; then
+        echo "ServerActive=$ZABBIX_SERVER_IP" >> /etc/zabbix/zabbix_agentd.conf
     else
-        sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agent2.conf
+        sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" /etc/zabbix/zabbix_agentd.conf
     fi
 
-    if ! grep -q "^Hostname=" /etc/zabbix/zabbix_agent2.conf; then
-        echo "Hostname=$HOSTNAME" >> /etc/zabbix/zabbix_agent2.conf
+    if ! grep -q "^Hostname=" /etc/zabbix/zabbix_agentd.conf; then
+        echo "Hostname=$HOSTNAME" >> /etc/zabbix/zabbix_agentd.conf
     else
-        sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agent2.conf
+        sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
     fi
 
     # Ensure Include directive exists
-    if ! grep -q "^Include=" /etc/zabbix/zabbix_agent2.conf; then
-        echo "Include=/etc/zabbix/zabbix_agent2.d/*.conf" >> /etc/zabbix/zabbix_agent2.conf
+    if ! grep -q "^Include=" /etc/zabbix/zabbix_agentd.conf; then
+        echo "Include=/etc/zabbix/zabbix_agentd.d/*.conf" >> /etc/zabbix/zabbix_agentd.conf
     fi
 fi
 
 # Create UserParameters file if it doesn't exist
-if [ ! -f /etc/zabbix/zabbix_agent2.d/userparameters.conf ]; then
-    cat > /etc/zabbix/zabbix_agent2.d/userparameters.conf << EOF
+if [ ! -f /etc/zabbix/zabbix_agentd.d/userparameters.conf ]; then
+    cat > /etc/zabbix/zabbix_agentd.d/userparameters.conf << EOF
 # Custom script parameters
 UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh
 UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh
@@ -127,16 +126,16 @@ EOF
 fi
 
 # Set proper permissions on configuration files
-chown zabbix:zabbix /etc/zabbix/zabbix_agent2.conf
-chmod 640 /etc/zabbix/zabbix_agent2.conf
-chown zabbix:zabbix /etc/zabbix/zabbix_agent2.d/userparameters.conf
-chmod 640 /etc/zabbix/zabbix_agent2.d/userparameters.conf
+chown zabbix:zabbix /etc/zabbix/zabbix_agentd.conf
+chmod 640 /etc/zabbix/zabbix_agentd.conf
+chown zabbix:zabbix /etc/zabbix/zabbix_agentd.d/userparameters.conf
+chmod 640 /etc/zabbix/zabbix_agentd.d/userparameters.conf
 
 # Configure sudo permissions for Zabbix user
 echo "Configuring sudo permissions..." | tee -a "$LOG_FILE"
 cat > /etc/sudoers.d/zabbix << EOF
 zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /usr/bin/top
-Defaults:zabbix !requiretty
+Default:zabbix !requiretty
 EOF
 chmod 440 /etc/sudoers.d/zabbix || { echo "Failed to set sudo permissions" >&2; exit 1; }
 
@@ -151,7 +150,7 @@ chmod 755 /etc/zabbix/scripts
 
 # Test configuration before starting service
 echo "Testing configuration..." | tee -a "$LOG_FILE"
-if ! sudo -u zabbix zabbix_agent2 -t /etc/zabbix/zabbix_agent2.conf; then
+if ! sudo -u zabbix zabbix_agentd -t /etc/zabbix/zabbix_agentd.conf; then
     echo "Configuration test failed. Please check the configuration file." | tee -a "$LOG_FILE"
     exit 1
 fi
@@ -159,21 +158,21 @@ fi
 # Restart Zabbix agent
 echo "Restarting Zabbix agent..." | tee -a "$LOG_FILE"
 systemctl daemon-reload
-systemctl stop zabbix-agent2 2>/dev/null
+systemctl stop zabbix-agent 2>/dev/null
 sleep 2
-systemctl start zabbix-agent2 || { 
-    echo "Failed to start zabbix-agent2, checking logs..." | tee -a "$LOG_FILE"
-    journalctl -u zabbix-agent2 --no-pager -n 50 | tee -a "$LOG_FILE"
+systemctl start zabbix-agent || { 
+    echo "Failed to start zabbix-agent, checking logs..." | tee -a "$LOG_FILE"
+    journalctl -u zabbix-agent --no-pager -n 50 | tee -a "$LOG_FILE"
     exit 1
 }
-systemctl enable zabbix-agent2 || { echo "Failed to enable zabbix-agent2" >&2; exit 1; }
+systemctl enable zabbix-agent || { echo "Failed to enable zabbix-agent" >&2; exit 1; }
 
 # Verify installation
-if systemctl is-active --quiet zabbix-agent2; then
+if systemctl is-active --quiet zabbix-agent; then
     echo "Installation completed successfully!" | tee -a "$LOG_FILE"
     echo
     echo "Zabbix Agent has been installed and configured successfully!"
-    echo "Configuration file: /etc/zabbix/zabbix_agent2.conf"
+    echo "Configuration file: /etc/zabbix/zabbix_agentd.conf"
     echo "Log file: $LOG_FILE"
     echo "Monitoring scripts are installed in: /etc/zabbix/scripts/"
     echo
@@ -181,7 +180,7 @@ if systemctl is-active --quiet zabbix-agent2; then
 else
     echo "Installation completed with warnings. Zabbix agent service may not be running correctly." | tee -a "$LOG_FILE"
     echo "Please check the log file for details: $LOG_FILE"
-    echo "Try running: systemctl status zabbix-agent2"
-    echo "Check logs with: journalctl -u zabbix-agent2"
+    echo "Try running: systemctl status zabbix-agent"
+    echo "Check logs with: journalctl -u zabbix-agent"
     exit 1
 fi
