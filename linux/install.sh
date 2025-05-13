@@ -50,7 +50,8 @@ echo "Installing required packages..." | tee -a "$LOG_FILE"
 # Check Ubuntu version and handle dependencies accordingly
 if [ "$(lsb_release -rs)" = "24.04" ]; then
     echo "Detected Ubuntu 24.04, installing required dependencies..." | tee -a "$LOG_FILE"
-    apt install -y libldap-2.5-0 || { echo "Failed to install libldap" >&2; exit 1; }
+    # Install required dependencies for Ubuntu 24.04
+    apt install -y libldap-2.6-0 || { echo "Failed to install libldap" >&2; exit 1; }
 fi
 
 # Install Zabbix agent and other required packages
