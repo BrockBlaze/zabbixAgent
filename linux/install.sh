@@ -98,7 +98,13 @@ LogFileSize=0
 EnableRemoteCommands=1
 LogRemoteCommands=1
 Timeout=30
-Include=/etc/zabbix/zabbix_agent2.d/*.conf
+
+# Custom script parameters
+UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh
+UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh
+UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
+UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
+UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
 EOF
 else
     # Only update specific lines if they exist, otherwise append them
@@ -120,29 +126,20 @@ else
         sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agent2.conf
     fi
 
-    # Ensure Include directive exists
-    if ! grep -q "^Include=" /etc/zabbix/zabbix_agent2.conf; then
-        echo "Include=/etc/zabbix/zabbix_agent2.d/*.conf" >> /etc/zabbix/zabbix_agent2.conf
+    # Add UserParameters if they don't exist
+    if ! grep -q "^UserParameter=system.temperature" /etc/zabbix/zabbix_agent2.conf; then
+        echo -e "\n# Custom script parameters" >> /etc/zabbix/zabbix_agent2.conf
+        echo "UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh" >> /etc/zabbix/zabbix_agent2.conf
+        echo "UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh" >> /etc/zabbix/zabbix_agent2.conf
+        echo "UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins" >> /etc/zabbix/zabbix_agent2.conf
+        echo "UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins" >> /etc/zabbix/zabbix_agent2.conf
+        echo "UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10" >> /etc/zabbix/zabbix_agent2.conf
     fi
-fi
-
-# Create UserParameters file if it doesn't exist
-if [ ! -f /etc/zabbix/zabbix_agent2.d/userparameters.conf ]; then
-    cat > /etc/zabbix/zabbix_agent2.d/userparameters.conf << EOF
-# Custom script parameters
-UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh
-UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh
-UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
-UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
-UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
-EOF
 fi
 
 # Set proper permissions on configuration files
 chown zabbix:zabbix /etc/zabbix/zabbix_agent2.conf
 chmod 640 /etc/zabbix/zabbix_agent2.conf
-chown zabbix:zabbix /etc/zabbix/zabbix_agent2.d/userparameters.conf
-chmod 640 /etc/zabbix/zabbix_agent2.d/userparameters.conf
 
 # Configure sudo permissions for Zabbix user
 echo "Configuring sudo permissions..." | tee -a "$LOG_FILE"
