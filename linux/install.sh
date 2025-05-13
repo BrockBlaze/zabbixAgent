@@ -46,6 +46,14 @@ apt update || { echo "Failed to update package list" >&2; exit 1; }
 
 # Install required packages
 echo "Installing required packages..." | tee -a "$LOG_FILE"
+
+# Check Ubuntu version and handle dependencies accordingly
+if [ "$(lsb_release -rs)" = "24.04" ]; then
+    echo "Detected Ubuntu 24.04, installing required dependencies..." | tee -a "$LOG_FILE"
+    apt install -y libldap-2.5-0 || { echo "Failed to install libldap" >&2; exit 1; }
+fi
+
+# Install Zabbix agent and other required packages
 apt install -y zabbix-agent lm-sensors || { echo "Failed to install required packages" >&2; exit 1; }
 
 # Configure sensors (with error handling)
@@ -135,7 +143,7 @@ chmod 640 /etc/zabbix/zabbix_agentd.d/userparameters.conf
 echo "Configuring sudo permissions..." | tee -a "$LOG_FILE"
 cat > /etc/sudoers.d/zabbix << EOF
 zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /usr/bin/top
-Default:zabbix !requiretty
+Defaults:zabbix !requiretty
 EOF
 chmod 440 /etc/sudoers.d/zabbix || { echo "Failed to set sudo permissions" >&2; exit 1; }
 
