@@ -52,6 +52,10 @@ if [ "$(lsb_release -rs)" = "24.04" ]; then
     echo "Detected Ubuntu 24.04, installing required dependencies..." | tee -a "$LOG_FILE"
     # Install required dependencies for Ubuntu 24.04
     apt install -y libldap2-dev || { echo "Failed to install libldap development package" >&2; exit 1; }
+    
+    # Create symbolic link for libldap
+    echo "Creating symbolic link for libldap..." | tee -a "$LOG_FILE"
+    ln -sf /usr/lib/x86_64-linux-gnu/libldap-2.6.so.0 /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0 || { echo "Failed to create symbolic link" >&2; exit 1; }
 fi
 
 # Install Zabbix agent and other required packages
