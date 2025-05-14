@@ -44,9 +44,9 @@ fi
 
 # Add Zabbix repository
 echo "Adding Zabbix repository for Ubuntu $ZABBIX_REPO_VERSION..." | tee -a "$LOG_FILE"
-wget https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu${ZABBIX_REPO_VERSION}_all.deb || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
-dpkg -i zabbix-release_6.4-1+ubuntu${ZABBIX_REPO_VERSION}_all.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
-# rm zabbix-release_6.4-1+ubuntu${ZABBIX_REPO_VERSION}_all.deb
+wget https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-4+ubuntu${ZABBIX_REPO_VERSION}_all.deb || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
+dpkg -i zabbix-release_6.0-4+ubuntu${ZABBIX_REPO_VERSION}_all.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
+rm zabbix-release_6.0-4+ubuntu${ZABBIX_REPO_VERSION}_all.deb || echo "Warning: Failed to remove repository package" | tee -a "$LOG_FILE"
 
 # Update package list
 echo "Updating package list..." | tee -a "$LOG_FILE"
