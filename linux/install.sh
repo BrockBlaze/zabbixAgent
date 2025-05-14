@@ -34,11 +34,19 @@ if [ -z "$HOSTNAME" ]; then
     HOSTNAME=$(hostname)
 fi
 
+# Determine Ubuntu version for Zabbix repo
+UBUNTU_VERSION=$(lsb_release -rs)
+if [ "$UBUNTU_VERSION" = "24.04" ]; then
+    ZABBIX_REPO_VERSION="22.04"
+else
+    ZABBIX_REPO_VERSION="$UBUNTU_VERSION"
+fi
+
 # Add Zabbix repository
-echo "Adding Zabbix repository..." | tee -a "$LOG_FILE"
-wget https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
-dpkg -i zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
-# rm zabbix-release_6.4-1+ubuntu$(lsb_release -rs)_all.deb
+echo "Adding Zabbix repository for Ubuntu $ZABBIX_REPO_VERSION..." | tee -a "$LOG_FILE"
+wget https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu${ZABBIX_REPO_VERSION}_all.deb || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
+dpkg -i zabbix-release_6.4-1+ubuntu${ZABBIX_REPO_VERSION}_all.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
+# rm zabbix-release_6.4-1+ubuntu${ZABBIX_REPO_VERSION}_all.deb
 
 # Update package list
 echo "Updating package list..." | tee -a "$LOG_FILE"
