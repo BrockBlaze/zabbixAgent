@@ -252,13 +252,17 @@ chmod 755 /etc/zabbix/scripts
 # Test configuration before starting service
 echo "Testing configuration..." | tee -a "$LOG_FILE"
 if [ "$AGENT_TYPE" = "zabbix-agent2" ]; then
-    TEST_CMD="zabbix_agent2 -t"
+    if ! zabbix_agent2 -c "$AGENT_CONFIG" -t "agent.ping" 2>/dev/null | grep -q "\[1\]"; then
+        echo "Warning: Configuration test had issues, but continuing..." | tee -a "$LOG_FILE"
+    else
+        echo "Configuration test passed" | tee -a "$LOG_FILE"
+    fi
 else
-    TEST_CMD="zabbix_agentd -t"
-fi
-
-if ! sudo -u zabbix $TEST_CMD "$AGENT_CONFIG" 2>/dev/null; then
-    echo "Warning: Configuration test had issues, but continuing..." | tee -a "$LOG_FILE"
+    if ! zabbix_agentd -c "$AGENT_CONFIG" -t "agent.ping" 2>/dev/null | grep -q "\[1\]"; then
+        echo "Warning: Configuration test had issues, but continuing..." | tee -a "$LOG_FILE"
+    else
+        echo "Configuration test passed" | tee -a "$LOG_FILE"
+    fi
 fi
 
 # Restart Zabbix agent
