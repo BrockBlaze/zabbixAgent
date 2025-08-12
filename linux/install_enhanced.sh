@@ -131,11 +131,11 @@ get_configuration() {
     
     # Get Zabbix server IP with validation
     while true; do
-        echo -n "Enter Zabbix Server IP [default: 192.168.1.30]: "
+        echo -n "Enter Zabbix Server IP [default: 192.168.70.2]: "
         read ZABBIX_SERVER_IP
         
         if [ -z "$ZABBIX_SERVER_IP" ]; then
-            ZABBIX_SERVER_IP="192.168.1.30"
+            ZABBIX_SERVER_IP="192.168.70.2"
             break
         elif [[ $ZABBIX_SERVER_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             break

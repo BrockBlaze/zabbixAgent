@@ -21,10 +21,10 @@ if ! grep -q 'Ubuntu\|Debian' /etc/os-release; then
 fi
 
 # Get Zabbix server IP
-echo "Enter Zabbix Server IP [default: 192.168.1.30]: "
+echo "Enter Zabbix Server IP [default: 192.168.70.2]: "
 read ZABBIX_SERVER_IP
 if [ -z "$ZABBIX_SERVER_IP" ]; then
-    ZABBIX_SERVER_IP="192.168.1.30"
+    ZABBIX_SERVER_IP="192.168.70.2"
 fi
 
 # Get hostname
