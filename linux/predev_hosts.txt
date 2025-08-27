@@ -1,5 +1,0 @@
-# Predev Servers for Zabbix Agent Deployment
-# Zabbix Server: 192.168.70.2
-
-Arc 192.168.68.146
-Cobalt 192.168.70.35

@@ -1,305 +1,282 @@
 #!/bin/bash
 
-# Check for root privileges
-if [ "$(id -u)" -ne 0 ]; then
-    echo "This script must be run as root" >&2
-    exit 1
-fi
+# Rithm Zabbix Agent - Clean Installer
+# Version: 5.0.0 - Streamlined
+# Usage: curl -sSL [url]/install_clean.sh | sudo bash
+# Or: ssh user@server "curl -sSL [url]/install_clean.sh | sudo bash"
 
-# Basic configuration
+set -euo pipefail
+
+# Configuration
+ZABBIX_SERVER="${ZABBIX_SERVER:-192.168.70.2}"
+HOSTNAME="${HOSTNAME:-$(hostname)}"
 LOG_FILE="/var/log/zabbix/install.log"
-VERSION="2.0.1"
 
-# Create log directory and start logging
-mkdir -p "$(dirname $LOG_FILE)" || { echo "Failed to create log directory" >&2; exit 1; }
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting Zabbix Agent installation (Version $VERSION)..." | tee -a "$LOG_FILE"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Check system compatibility
-if ! grep -q 'Ubuntu\|Debian' /etc/os-release; then
-    echo "ERROR: This script only supports Ubuntu/Debian systems" | tee -a "$LOG_FILE"
-    exit 1
-fi
+# Functions
+log() { echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"; }
+success() { echo -e "${GREEN}✓${NC} $1" | tee -a "$LOG_FILE"; }
+warning() { echo -e "${YELLOW}⚠${NC} $1" | tee -a "$LOG_FILE"; }
+error() { echo -e "${RED}✗${NC} $1" | tee -a "$LOG_FILE"; exit 1; }
 
-# Get Zabbix server IP
-echo "Enter Zabbix Server IP [default: 192.168.70.2]: "
-read ZABBIX_SERVER_IP
-if [ -z "$ZABBIX_SERVER_IP" ]; then
-    ZABBIX_SERVER_IP="192.168.70.2"
-fi
+# Check root
+[[ $EUID -eq 0 ]] || error "This script must be run as root"
 
-# Get hostname
-echo "Enter Hostname for this server [default: $(hostname)]: "
-read HOSTNAME
-if [ -z "$HOSTNAME" ]; then
-    HOSTNAME=$(hostname)
-fi
+# Create log directory
+mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
 
-# Determine Ubuntu version for Zabbix repo
-UBUNTU_VERSION=$(lsb_release -rs)
-case "$UBUNTU_VERSION" in
-    "24.04")
-        ZABBIX_REPO_VERSION="22.04"
-        ZABBIX_VERSION="7.0"
-        ;;
-    "22.04")
-        ZABBIX_REPO_VERSION="22.04"
-        ZABBIX_VERSION="6.0"
-        ;;
-    "20.04")
-        ZABBIX_REPO_VERSION="20.04"
-        ZABBIX_VERSION="6.0"
-        ;;
-    *)
-        echo "WARNING: Unsupported Ubuntu version $UBUNTU_VERSION, attempting with 6.0" | tee -a "$LOG_FILE"
-        ZABBIX_REPO_VERSION="$UBUNTU_VERSION"
-        ZABBIX_VERSION="6.0"
-        ;;
+log "=============================================="
+log " Rithm Zabbix Agent - Clean Install v5.0.0"
+log "=============================================="
+log "Server: $ZABBIX_SERVER | Host: $HOSTNAME"
+
+# Detect system
+OS_VERSION=$(lsb_release -rs 2>/dev/null || echo "unknown")
+case "$OS_VERSION" in
+    24.04) ZABBIX_VERSION="7.0"; REPO_VERSION="22.04" ;;
+    22.04) ZABBIX_VERSION="6.4"; REPO_VERSION="22.04" ;;
+    20.04) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04" ;;
+    *) ZABBIX_VERSION="6.0"; REPO_VERSION="22.04"; warning "Unknown Ubuntu version, using defaults" ;;
 esac
+log "Ubuntu $OS_VERSION detected, using Zabbix $ZABBIX_VERSION"
 
-# Add Zabbix repository
-echo "Adding Zabbix repository version $ZABBIX_VERSION for Ubuntu $ZABBIX_REPO_VERSION..." | tee -a "$LOG_FILE"
+# Install repository
+log "Installing Zabbix repository..."
+wget -q -O /tmp/zabbix-release.deb \
+    "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-4+ubuntu${REPO_VERSION}_all.deb" \
+    || error "Failed to download Zabbix repository"
 
-# Clean up any previous repository files
-rm -f /tmp/zabbix-release*.deb 2>/dev/null
+dpkg -i /tmp/zabbix-release.deb >/dev/null 2>&1
+apt-get update -qq || error "Failed to update package list"
+success "Repository installed"
 
-# Determine correct repository package version
-if [ "$ZABBIX_VERSION" = "7.0" ]; then
-    REPO_URL="https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu${ZABBIX_REPO_VERSION}_all.deb"
-else
-    REPO_URL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-4+ubuntu${ZABBIX_REPO_VERSION}_all.deb"
-fi
+# Install packages
+log "Installing Zabbix agent and monitoring tools..."
+apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat || \
+    { apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat || error "Failed to install packages"; }
 
-echo "Downloading from: $REPO_URL" | tee -a "$LOG_FILE"
-wget -O /tmp/zabbix-release.deb "$REPO_URL" || { echo "Failed to download Zabbix repository package" >&2; exit 1; }
-dpkg -i /tmp/zabbix-release.deb || { echo "Failed to install Zabbix repository" >&2; exit 1; }
-rm -f /tmp/zabbix-release.deb || echo "Warning: Failed to remove repository package" | tee -a "$LOG_FILE"
-
-# Update package list
-echo "Updating package list..." | tee -a "$LOG_FILE"
-apt update || { echo "Failed to update package list" >&2; exit 1; }
-
-# Install required packages
-echo "Installing required packages..." | tee -a "$LOG_FILE"
-
-# Check Ubuntu version and handle dependencies accordingly
-case "$(lsb_release -rs)" in
-    "24.04")
-        echo "Detected Ubuntu 24.04, installing required dependencies..." | tee -a "$LOG_FILE"
-        # Install required dependencies for Ubuntu 24.04
-        apt install -y libldap2-dev libssl-dev || { echo "Failed to install required development packages" >&2; exit 1; }
-        
-        # Create symbolic link for libldap if needed
-        if [ ! -f /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0 ]; then
-            echo "Creating symbolic link for libldap compatibility..." | tee -a "$LOG_FILE"
-            ln -sf /usr/lib/x86_64-linux-gnu/libldap-2.6.so.0 /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0 || echo "Warning: Could not create libldap symlink" | tee -a "$LOG_FILE"
-        fi
-        ;;
-    "22.04")
-        echo "Detected Ubuntu 22.04, checking dependencies..." | tee -a "$LOG_FILE"
-        # Ubuntu 22.04 usually has compatible libraries
-        ;;
-    "20.04")
-        echo "Detected Ubuntu 20.04, checking dependencies..." | tee -a "$LOG_FILE"
-        # Install any specific dependencies for 20.04 if needed
-        apt install -y libssl1.1 2>/dev/null || echo "Note: libssl1.1 may not be needed" | tee -a "$LOG_FILE"
-        ;;
-esac
-
-# Install Zabbix agent and other required packages
-echo "Installing Zabbix agent2 and dependencies..." | tee -a "$LOG_FILE"
-if ! apt install -y zabbix-agent2 lm-sensors smartmontools nvme-cli; then
-    echo "Failed to install zabbix-agent2, trying fallback to zabbix-agent..." | tee -a "$LOG_FILE"
-    apt install -y zabbix-agent lm-sensors smartmontools nvme-cli || { echo "Failed to install Zabbix agent packages" >&2; exit 1; }
-    AGENT_TYPE="zabbix-agent"
-    AGENT_CONFIG="/etc/zabbix/zabbix_agentd.conf"
-    AGENT_SERVICE="zabbix-agent"
-else
-    AGENT_TYPE="zabbix-agent2"
-    AGENT_CONFIG="/etc/zabbix/zabbix_agent2.conf"
+# Detect installed agent
+if systemctl list-unit-files 2>/dev/null | grep -q zabbix-agent2; then
     AGENT_SERVICE="zabbix-agent2"
-fi
-echo "Installed: $AGENT_TYPE" | tee -a "$LOG_FILE"
-
-# Configure sensors (with error handling)
-echo "Configuring sensors..." | tee -a "$LOG_FILE"
-if command -v sensors-detect >/dev/null 2>&1; then
-    yes | sensors-detect >/dev/null 2>&1 || echo "Warning: sensors-detect may not have completed successfully" | tee -a "$LOG_FILE"
+    AGENT_CONFIG="/etc/zabbix/zabbix_agent2.conf"
+    CUSTOM_DIR="/etc/zabbix/zabbix_agent2.d"
 else
-    echo "Warning: sensors-detect not found, skipping sensor configuration" | tee -a "$LOG_FILE"
+    AGENT_SERVICE="zabbix-agent"
+    AGENT_CONFIG="/etc/zabbix/zabbix_agentd.conf"
+    CUSTOM_DIR="/etc/zabbix/zabbix_agentd.d"
 fi
+success "Installed $AGENT_SERVICE"
 
-# Create necessary directories
-echo "Creating required directories..." | tee -a "$LOG_FILE"
-mkdir -p /etc/zabbix/scripts || { echo "Failed to create scripts directory" >&2; exit 1; }
-mkdir -p /etc/zabbix/zabbix_agent2.d || { echo "Failed to create agent2.d directory" >&2; exit 1; }
-mkdir -p /var/log/zabbix || { echo "Failed to create log directory" >&2; exit 1; }
-mkdir -p /var/run/zabbix || { echo "Failed to create run directory" >&2; exit 1; }
+# Configure sensors
+log "Configuring hardware sensors..."
+yes | sensors-detect >/dev/null 2>&1 || warning "Sensor configuration may have failed"
 
-# Copy monitoring scripts
-echo "Installing monitoring scripts..." | tee -a "$LOG_FILE"
-if [ ! -d "$(dirname "$0")/scripts" ]; then
-    echo "Error: Scripts directory not found" >&2
-    exit 1
-fi
-cp -r "$(dirname "$0")/scripts"/*.sh /etc/zabbix/scripts/ || { echo "Failed to copy scripts" >&2; exit 1; }
-chmod +x /etc/zabbix/scripts/*.sh || { echo "Failed to set script permissions" >&2; exit 1; }
+# Create main configuration
+log "Creating agent configuration..."
+cat > "$AGENT_CONFIG" << EOF
+# Rithm Zabbix Agent Configuration
+# Generated: $(date)
+# Host: $HOSTNAME
 
-# Create Zabbix agent configuration
-echo "Creating Zabbix agent configuration..." | tee -a "$LOG_FILE"
-if [ ! -f "$AGENT_CONFIG" ]; then
-    cat > "$AGENT_CONFIG" << EOF
-Server=$ZABBIX_SERVER_IP
-ServerActive=$ZABBIX_SERVER_IP
+Server=$ZABBIX_SERVER
+ServerActive=$ZABBIX_SERVER:10051
 Hostname=$HOSTNAME
-PidFile=/var/run/zabbix/zabbix_agent2.pid
-LogFile=/var/log/zabbix/zabbix_agent2.log
-LogFileSize=0
-EnableRemoteCommands=1
-LogRemoteCommands=1
+
+# Performance
+StartAgents=3
 Timeout=30
+BufferSize=100
+BufferSend=5
 
-# Custom script parameters
-UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh
-UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh
-UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins
-UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins
-UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10
+# Logging
+LogFile=/var/log/zabbix/$(basename $AGENT_CONFIG .conf).log
+LogFileSize=10
+DebugLevel=3
 
-# Disk temperature monitoring
-UserParameter=disk.temperature[*],/etc/zabbix/scripts/disk_temp.sh $1
-UserParameter=disk.temperature.discovery,/etc/zabbix/scripts/disk_temp.sh discover
-UserParameter=disk.temperature.all,/etc/zabbix/scripts/disk_temp.sh all
-UserParameter=disk.temperature.average,/etc/zabbix/scripts/disk_temp.sh average
-UserParameter=disk.temperature.max,/etc/zabbix/scripts/disk_temp.sh max
+# Security
+AllowKey=system.run[*]
+DenyKey=system.run[rm *]
+DenyKey=system.run[shutdown *]
 
-# Disk health monitoring
-UserParameter=disk.health[*],/etc/zabbix/scripts/disk_health.sh health $1
-UserParameter=disk.wear[*],/etc/zabbix/scripts/disk_health.sh wear $1
-UserParameter=disk.reallocated[*],/etc/zabbix/scripts/disk_health.sh reallocated $1
-UserParameter=disk.pending[*],/etc/zabbix/scripts/disk_health.sh pending $1
-UserParameter=disk.power_hours[*],/etc/zabbix/scripts/disk_health.sh hours $1
-UserParameter=disk.info[*],/etc/zabbix/scripts/disk_health.sh info $1
-UserParameter=disk.stats[*],/etc/zabbix/scripts/disk_health.sh json $1
+# Include custom parameters
+Include=$CUSTOM_DIR/*.conf
 EOF
-else
-    # Only update specific lines if they exist, otherwise append them
-    if ! grep -q "^Server=" "$AGENT_CONFIG"; then
-        echo "Server=$ZABBIX_SERVER_IP" >> "$AGENT_CONFIG"
-    else
-        sed -i "s/^Server=.*/Server=$ZABBIX_SERVER_IP/" "$AGENT_CONFIG"
-    fi
 
-    if ! grep -q "^ServerActive=" "$AGENT_CONFIG"; then
-        echo "ServerActive=$ZABBIX_SERVER_IP" >> "$AGENT_CONFIG"
-    else
-        sed -i "s/^ServerActive=.*/ServerActive=$ZABBIX_SERVER_IP/" "$AGENT_CONFIG"
-    fi
+# Create custom parameters directory
+mkdir -p "$CUSTOM_DIR"
 
-    if ! grep -q "^Hostname=" "$AGENT_CONFIG"; then
-        echo "Hostname=$HOSTNAME" >> "$AGENT_CONFIG"
-    else
-        sed -i "s/^Hostname=.*/Hostname=$HOSTNAME/" "$AGENT_CONFIG"
-    fi
+# Create streamlined custom parameters with consistent naming
+log "Creating custom monitoring parameters..."
+cat > "$CUSTOM_DIR/rithm_custom.conf" << 'EOF'
+# Rithm Custom Parameters - Clean v5.0.0
+# All parameters use consistent custom.* naming
 
-    # Add UserParameters if they don't exist
-    if ! grep -q "^UserParameter=system.temperature" "$AGENT_CONFIG"; then
-        echo -e "\n# Custom script parameters" >> "$AGENT_CONFIG"
-        echo "UserParameter=system.temperature,/etc/zabbix/scripts/cpu_temp.sh" >> "$AGENT_CONFIG"
-        echo "UserParameter=system.processes,/etc/zabbix/scripts/top_processes.sh" >> "$AGENT_CONFIG"
-        echo "UserParameter=system.login.failed,/etc/zabbix/scripts/login_monitoring.sh failed_logins" >> "$AGENT_CONFIG"
-        echo "UserParameter=system.login.successful,/etc/zabbix/scripts/login_monitoring.sh successful_logins" >> "$AGENT_CONFIG"
-        echo "UserParameter=system.login.last10,/etc/zabbix/scripts/login_monitoring.sh last10" >> "$AGENT_CONFIG"
-        echo "" >> "$AGENT_CONFIG"
-        echo "# Disk temperature monitoring" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.temperature[*],/etc/zabbix/scripts/disk_temp.sh \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.temperature.discovery,/etc/zabbix/scripts/disk_temp.sh discover" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.temperature.all,/etc/zabbix/scripts/disk_temp.sh all" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.temperature.average,/etc/zabbix/scripts/disk_temp.sh average" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.temperature.max,/etc/zabbix/scripts/disk_temp.sh max" >> "$AGENT_CONFIG"
-        echo "" >> "$AGENT_CONFIG"
-        echo "# Disk health monitoring" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.health[*],/etc/zabbix/scripts/disk_health.sh health \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.wear[*],/etc/zabbix/scripts/disk_health.sh wear \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.reallocated[*],/etc/zabbix/scripts/disk_health.sh reallocated \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.pending[*],/etc/zabbix/scripts/disk_health.sh pending \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.power_hours[*],/etc/zabbix/scripts/disk_health.sh hours \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.info[*],/etc/zabbix/scripts/disk_health.sh info \$1" >> "$AGENT_CONFIG"
-        echo "UserParameter=disk.stats[*],/etc/zabbix/scripts/disk_health.sh json \$1" >> "$AGENT_CONFIG"
-    fi
-fi
+### SYSTEM MONITORING ###
+UserParameter=custom.system.uptime,uptime | awk '{print $3}' | sed 's/,//'
+UserParameter=custom.system.kernel,uname -r
+UserParameter=custom.system.reboot_required,test -f /var/run/reboot-required && echo 1 || echo 0
 
-# Set proper permissions on configuration files
-chown zabbix:zabbix "$AGENT_CONFIG"
-chmod 640 "$AGENT_CONFIG"
+### CPU MONITORING ###
+UserParameter=custom.cpu.temperature,sensors 2>/dev/null | grep -E 'Core|Package' | grep -oE '[0-9]+\.[0-9]+°C' | head -1 | grep -oE '[0-9]+\.[0-9]+' || echo 0
+UserParameter=custom.cpu.cores,nproc
+UserParameter=custom.cpu.load_1min,uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//'
+UserParameter=custom.cpu.load_5min,uptime | awk -F'load average:' '{print $2}' | awk '{print $2}' | sed 's/,//'
 
-# Configure sudo permissions for Zabbix user
-echo "Configuring sudo permissions..." | tee -a "$LOG_FILE"
-cat > /etc/sudoers.d/zabbix << EOF
-zabbix ALL=(ALL) NOPASSWD: /usr/bin/last, /usr/bin/grep, /usr/bin/sensors, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /usr/bin/top, /usr/sbin/smartctl, /usr/sbin/nvme
+### MEMORY MONITORING ###
+UserParameter=custom.memory.available,free -b | awk '/^Mem:/{print $7}'
+UserParameter=custom.memory.used_percent,free | awk '/^Mem:/{printf "%.2f", ($3/$2)*100}'
+UserParameter=custom.memory.swap_used,free -b | awk '/^Swap:/{print $3}'
+
+### DISK MONITORING ###
+UserParameter=custom.disk.count,lsblk -d -o TYPE | grep -c disk
+UserParameter=custom.disk.root_usage,df / | awk 'NR==2{print $5}' | sed 's/%//'
+UserParameter=custom.disk.temperature[*],smartctl -A /dev/$1 2>/dev/null | grep Temperature_Celsius | awk '{print $10}' || echo 0
+UserParameter=custom.disk.smart_status[*],smartctl -H /dev/$1 2>/dev/null | grep -q "PASSED" && echo 1 || echo 0
+UserParameter=custom.disk.io_wait,iostat -x 1 1 | tail -n +4 | awk '{sum+=$10} END {printf "%.2f", sum/NR}' || echo 0
+
+### NETWORK MONITORING ###
+UserParameter=custom.network.connections_established,ss -tan | grep ESTABLISHED | wc -l
+UserParameter=custom.network.connections_listening,ss -tln | grep LISTEN | wc -l
+UserParameter=custom.network.connections_timewait,ss -tan | grep TIME-WAIT | wc -l
+
+### SERVICE MONITORING ###
+UserParameter=custom.service.status[*],systemctl is-active $1 2>/dev/null || echo "inactive"
+UserParameter=custom.service.count_running,systemctl list-units --type=service --state=running --no-pager | grep -c "\.service"
+UserParameter=custom.service.count_failed,systemctl list-units --type=service --state=failed --no-pager | grep -c "\.service"
+
+### PROCESS MONITORING ###
+UserParameter=custom.process.top_cpu,ps aux | sort -nrk 3,3 | head -1 | awk '{print $2":"$3":"$11}'
+UserParameter=custom.process.top_memory,ps aux | sort -nrk 4,4 | head -1 | awk '{print $2":"$4":"$11}'
+UserParameter=custom.process.zombie_count,ps aux | awk '$8 ~ /^Z/ {count++} END {print count+0}'
+UserParameter=custom.process.total_count,ps aux | wc -l
+
+### LOGIN MONITORING ###
+UserParameter=custom.login.failed_last_hour,grep "authentication failure" /var/log/auth.log 2>/dev/null | grep "$(date --date='1 hour ago' '+%b %d %H')" | wc -l || echo 0
+UserParameter=custom.login.successful_last_hour,grep "Accepted" /var/log/auth.log 2>/dev/null | grep "$(date --date='1 hour ago' '+%b %d %H')" | wc -l || echo 0
+UserParameter=custom.login.last_user,last -n 1 | head -1 | awk '{print $1}' || echo "none"
+UserParameter=custom.login.current_users,who | wc -l
+
+### SECURITY MONITORING ###
+UserParameter=custom.security.updates_available,apt list --upgradable 2>/dev/null | grep -c upgradable || echo 0
+UserParameter=custom.security.updates_security,apt list --upgradable 2>/dev/null | grep -c security || echo 0
+UserParameter=custom.security.sudo_attempts,grep "sudo:" /var/log/auth.log 2>/dev/null | grep "$(date '+%b %d')" | wc -l || echo 0
+
+### LOG MONITORING ###
+UserParameter=custom.log.auth_errors,grep -iE "error|fail|denied" /var/log/auth.log 2>/dev/null | tail -100 | wc -l || echo 0
+UserParameter=custom.log.syslog_errors,grep -iE "error|critical|fail" /var/log/syslog 2>/dev/null | tail -100 | wc -l || echo 0
+UserParameter=custom.log.kern_errors,grep -iE "error|fail|critical" /var/log/kern.log 2>/dev/null | tail -100 | wc -l || echo 0
+
+### DOCKER MONITORING (if available) ###
+UserParameter=custom.docker.containers_running,docker ps -q 2>/dev/null | wc -l || echo 0
+UserParameter=custom.docker.containers_total,docker ps -aq 2>/dev/null | wc -l || echo 0
+UserParameter=custom.docker.images_count,docker images -q 2>/dev/null | wc -l || echo 0
+
+### DISCOVERY RULES ###
+UserParameter=custom.discovery.disks,lsblk -J -o NAME,TYPE | jq -c '.blockdevices | map(select(.type=="disk")) | map({"{#DISKNAME}": .name})'
+UserParameter=custom.discovery.services,systemctl list-unit-files --type=service --state=enabled --no-pager | tail -n +2 | head -n -2 | awk '{print $1}' | sed 's/.service$//' | jq -R -s -c 'split("\n")[:-1] | map({"{#SERVICE}": .})'
+UserParameter=custom.discovery.network_interfaces,ip -j link show | jq -c '[.[] | select(.operstate == "UP" and .ifname != "lo") | {"{#INTERFACE}": .ifname}]'
+EOF
+
+# Set permissions
+chown -R zabbix:zabbix "$AGENT_CONFIG" "$CUSTOM_DIR" 2>/dev/null || true
+chmod 640 "$AGENT_CONFIG" "$CUSTOM_DIR"/*.conf 2>/dev/null || true
+
+# Configure sudo permissions
+log "Configuring sudo permissions..."
+cat > /etc/sudoers.d/zabbix << 'EOF'
+# Zabbix monitoring permissions
+zabbix ALL=(ALL) NOPASSWD: /usr/bin/systemctl status *, /usr/bin/systemctl is-active *
+zabbix ALL=(ALL) NOPASSWD: /usr/sbin/smartctl, /usr/bin/sensors, /usr/bin/iostat
+zabbix ALL=(ALL) NOPASSWD: /usr/bin/apt list, /usr/bin/docker ps, /usr/bin/docker images
+zabbix ALL=(ALL) NOPASSWD: /bin/grep, /bin/cat /var/log/*, /usr/bin/tail /var/log/*
 Defaults:zabbix !requiretty
 EOF
-chmod 440 /etc/sudoers.d/zabbix || { echo "Failed to set sudo permissions" >&2; exit 1; }
+chmod 440 /etc/sudoers.d/zabbix
 
-# Set proper permissions on directories
-echo "Setting directory permissions..." | tee -a "$LOG_FILE"
-chown -R zabbix:zabbix /var/log/zabbix
-chmod 755 /var/log/zabbix
-chown -R zabbix:zabbix /var/run/zabbix
-chmod 755 /var/run/zabbix
-chown -R zabbix:zabbix /etc/zabbix/scripts
-chmod 755 /etc/zabbix/scripts
-
-# Test configuration before starting service
-echo "Testing configuration..." | tee -a "$LOG_FILE"
-if [ "$AGENT_TYPE" = "zabbix-agent2" ]; then
-    if ! zabbix_agent2 -c "$AGENT_CONFIG" -t "agent.ping" 2>/dev/null | grep -q "\[1\]"; then
-        echo "Warning: Configuration test had issues, but continuing..." | tee -a "$LOG_FILE"
-    else
-        echo "Configuration test passed" | tee -a "$LOG_FILE"
-    fi
-else
-    if ! zabbix_agentd -c "$AGENT_CONFIG" -t "agent.ping" 2>/dev/null | grep -q "\[1\]"; then
-        echo "Warning: Configuration test had issues, but continuing..." | tee -a "$LOG_FILE"
-    else
-        echo "Configuration test passed" | tee -a "$LOG_FILE"
-    fi
-fi
-
-# Restart Zabbix agent
-echo "Restarting Zabbix agent service: $AGENT_SERVICE..." | tee -a "$LOG_FILE"
+# Start and enable agent
+log "Starting Zabbix agent..."
 systemctl daemon-reload
-systemctl stop "$AGENT_SERVICE" 2>/dev/null
-sleep 2
-systemctl start "$AGENT_SERVICE" || { 
-    echo "Failed to start $AGENT_SERVICE, checking logs..." | tee -a "$LOG_FILE"
-    journalctl -u "$AGENT_SERVICE" --no-pager -n 50 | tee -a "$LOG_FILE"
-    exit 1
-}
-systemctl enable "$AGENT_SERVICE" || { echo "Failed to enable $AGENT_SERVICE" >&2; exit 1; }
+systemctl restart "$AGENT_SERVICE"
+systemctl enable "$AGENT_SERVICE"
 
-# Verify installation
+# Test installation
+sleep 3
 if systemctl is-active --quiet "$AGENT_SERVICE"; then
-    echo "Installation completed successfully!" | tee -a "$LOG_FILE"
-    echo
-    echo "========================================"
-    echo "Zabbix Agent Installation Summary:"
-    echo "========================================"
-    echo "Agent Type: $AGENT_TYPE"
-    echo "Ubuntu Version: $UBUNTU_VERSION"
-    echo "Zabbix Version: $ZABBIX_VERSION"
-    echo "Configuration file: $AGENT_CONFIG"
-    echo "Log file: $LOG_FILE"
-    echo "Server IP: $ZABBIX_SERVER_IP"
-    echo "Hostname: $HOSTNAME"
-    echo "Monitoring scripts: /etc/zabbix/scripts/"
-    echo "========================================"
-    echo
-    echo "To test a UserParameter: zabbix_get -s 127.0.0.1 -k \"parameter_name\""
-    echo "To check agent status: systemctl status $AGENT_SERVICE"
+    success "Agent is running ($AGENT_SERVICE)"
+    
+    # Test basic connectivity
+    if command -v zabbix_get >/dev/null && timeout 5 zabbix_get -s localhost -k agent.ping 2>/dev/null | grep -q "1"; then
+        success "Agent responds to ping"
+    else
+        warning "Agent ping test inconclusive (may need zabbix-get package)"
+    fi
+    
+    # Test a few custom parameters
+    for metric in "custom.cpu.temperature" "custom.memory.available" "custom.disk.count"; do
+        if command -v zabbix_get >/dev/null; then
+            result=$(timeout 3 zabbix_get -s localhost -k "$metric" 2>/dev/null || echo "test_failed")
+            if [[ "$result" != "test_failed" && "$result" != "" ]]; then
+                success "$metric: $result"
+            else
+                warning "$metric: Not ready yet"
+            fi
+        fi
+    done
 else
-    echo "Installation completed with warnings. Zabbix agent service may not be running correctly." | tee -a "$LOG_FILE"
-    echo "Please check the log file for details: $LOG_FILE"
-    echo "Try running: systemctl status $AGENT_SERVICE"
-    echo "Check logs with: journalctl -u $AGENT_SERVICE"
-    exit 1
+    error "Agent failed to start. Check: journalctl -u $AGENT_SERVICE"
 fi
+
+# Installation summary
+log "=============================================="
+success "Rithm Zabbix Agent Installation Complete!"
+log "=============================================="
+log "Host: $HOSTNAME"
+log "Server: $ZABBIX_SERVER"
+log "Agent: $AGENT_SERVICE"
+log "Config: $AGENT_CONFIG"
+log "Custom Parameters: $CUSTOM_DIR/rithm_custom.conf"
+log ""
+log "Next steps:"
+log "1. Import the Rithm template to your Zabbix server"
+log "2. Add this host with hostname '$HOSTNAME'"
+log "3. Test from Zabbix server:"
+log "   zabbix_get -s $(hostname -I | awk '{print $1}') -k custom.cpu.temperature"
+log ""
+log "All custom parameters use 'custom.*' naming for consistency"
+
+# Generate template summary for admin
+cat > "/tmp/rithm_template_info_$(hostname).txt" << EOF
+Rithm Zabbix Template Information
+Generated: $(date)
+Hostname: $HOSTNAME
+IP: $(hostname -I | awk '{print $1}')
+
+Custom Parameters Available:
+- custom.system.* (uptime, kernel, reboot_required)
+- custom.cpu.* (temperature, cores, load_*)
+- custom.memory.* (available, used_percent, swap_used)
+- custom.disk.* (count, root_usage, temperature[*], smart_status[*])
+- custom.network.* (connections_*)
+- custom.service.* (status[*], count_*)
+- custom.process.* (top_*, zombie_count, total_count)
+- custom.login.* (failed_*, successful_*, last_user)
+- custom.security.* (updates_*, sudo_attempts)
+- custom.log.* (*_errors)
+- custom.docker.* (containers_*, images_count)
+
+Discovery Rules:
+- custom.discovery.disks
+- custom.discovery.services
+- custom.discovery.network_interfaces
+
+Template file will be generated separately.
+EOF
+
+log "Template information saved to: /tmp/rithm_template_info_$(hostname).txt"
+success "Installation completed successfully!"
