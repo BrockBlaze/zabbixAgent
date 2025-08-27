@@ -11,6 +11,7 @@ set -euo pipefail
 ZABBIX_SERVER="${ZABBIX_SERVER:-192.168.70.2}"
 HOSTNAME="${HOSTNAME:-$(hostname)}"
 LOG_FILE="/var/log/zabbix/install.log"
+INSTALL_DIR="$(pwd)"
 
 # Colors
 RED='\033[0;31m'
@@ -23,7 +24,41 @@ NC='\033[0m'
 log() { echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"; }
 success() { echo -e "${GREEN}✓${NC} $1" | tee -a "$LOG_FILE"; }
 warning() { echo -e "${YELLOW}⚠${NC} $1" | tee -a "$LOG_FILE"; }
-error() { echo -e "${RED}✗${NC} $1" | tee -a "$LOG_FILE"; exit 1; }
+error() { echo -e "${RED}✗${NC} $1" | tee -a "$LOG_FILE"; cleanup_on_failure; exit 1; }
+
+# Cleanup function for failed installations
+cleanup_on_failure() {
+    log "Installation failed. Cleaning up..."
+    
+    # Stop and remove Zabbix services
+    systemctl stop zabbix-agent2 2>/dev/null || true
+    systemctl stop zabbix-agent 2>/dev/null || true
+    systemctl disable zabbix-agent2 2>/dev/null || true
+    systemctl disable zabbix-agent 2>/dev/null || true
+    
+    # Remove Zabbix packages
+    apt-get remove --purge -y zabbix-agent2 zabbix-agent 2>/dev/null || true
+    apt-get autoremove -y 2>/dev/null || true
+    
+    # Remove Zabbix repository
+    rm -f /etc/apt/sources.list.d/zabbix.list 2>/dev/null || true
+    apt-get update -qq 2>/dev/null || true
+    
+    # Remove configuration files and directories
+    rm -rf /etc/zabbix/ 2>/dev/null || true
+    rm -rf /var/log/zabbix/ 2>/dev/null || true
+    rm -rf /var/run/zabbix/ 2>/dev/null || true
+    rm -f /etc/sudoers.d/zabbix 2>/dev/null || true
+    
+    # Remove installation files if we're in a git clone
+    if [[ "$INSTALL_DIR" == *"zabbixAgent"* ]] && [[ -d "$INSTALL_DIR/.git" ]]; then
+        cd "$(dirname "$INSTALL_DIR")"
+        rm -rf "$INSTALL_DIR" 2>/dev/null || true
+        log "Removed git clone directory: $INSTALL_DIR"
+    fi
+    
+    log "Cleanup completed."
+}
 
 # Check root
 [[ $EUID -eq 0 ]] || error "This script must be run as root"
@@ -89,7 +124,6 @@ ServerActive=$ZABBIX_SERVER:10051
 Hostname=$HOSTNAME
 
 # Performance
-StartAgents=3
 Timeout=30
 BufferSize=100
 BufferSend=5
@@ -229,7 +263,9 @@ if systemctl is-active --quiet "$AGENT_SERVICE"; then
         fi
     done
 else
-    error "Agent failed to start. Check: journalctl -u $AGENT_SERVICE"
+    log "Agent failed to start. Checking logs..."
+    journalctl -u "$AGENT_SERVICE" -n 10 --no-pager | tee -a "$LOG_FILE"
+    error "Agent failed to start. Check logs above."
 fi
 
 # Installation summary
