@@ -114,7 +114,11 @@ yes | sensors-detect >/dev/null 2>&1 || warning "Sensor configuration may have f
 
 # Create main configuration
 log "Creating agent configuration..."
-cat > "$AGENT_CONFIG" << EOF
+
+# Check if using agent2 or older agent for config compatibility
+if [[ "$AGENT_SERVICE" == "zabbix-agent2" ]]; then
+    # Agent2 configuration (supports AllowKey/DenyKey)
+    cat > "$AGENT_CONFIG" << EOF
 # Rithm Zabbix Agent Configuration
 # Generated: $(date)
 # Host: $HOSTNAME
@@ -141,6 +145,35 @@ DenyKey=system.run[shutdown *]
 # Include custom parameters
 Include=$CUSTOM_DIR/*.conf
 EOF
+else
+    # Older agent configuration (doesn't support AllowKey/DenyKey)
+    cat > "$AGENT_CONFIG" << EOF
+# Rithm Zabbix Agent Configuration
+# Generated: $(date)
+# Host: $HOSTNAME
+
+Server=$ZABBIX_SERVER
+ServerActive=$ZABBIX_SERVER:10051
+Hostname=$HOSTNAME
+
+# Performance
+Timeout=30
+BufferSize=100
+BufferSend=5
+
+# Logging
+LogFile=/var/log/zabbix/$(basename $AGENT_CONFIG .conf).log
+LogFileSize=10
+DebugLevel=3
+
+# Security - using older format
+EnableRemoteCommands=1
+LogRemoteCommands=1
+
+# Include custom parameters
+Include=$CUSTOM_DIR/*.conf
+EOF
+fi
 
 # Create custom parameters directory
 mkdir -p "$CUSTOM_DIR"
