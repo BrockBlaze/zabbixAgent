@@ -108,9 +108,19 @@ else
 fi
 success "Installed $AGENT_SERVICE"
 
-# Create config directory if it doesn't exist
+# Create necessary directories with proper permissions
 mkdir -p /etc/zabbix 2>/dev/null || true
 mkdir -p "$CUSTOM_DIR" 2>/dev/null || true
+mkdir -p /var/log/zabbix 2>/dev/null || true
+mkdir -p /var/run/zabbix 2>/dev/null || true
+
+# Set proper ownership for zabbix user
+if id "zabbix" &>/dev/null; then
+    chown -R zabbix:zabbix /var/log/zabbix
+    chown -R zabbix:zabbix /var/run/zabbix
+    chmod 755 /var/log/zabbix
+    chmod 755 /var/run/zabbix
+fi
 
 # Configure sensors
 log "Configuring hardware sensors..."
