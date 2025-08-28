@@ -93,8 +93,8 @@ success "Repository installed"
 
 # Install packages
 log "Installing Zabbix agent and monitoring tools..."
-apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat || \
-    { apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat || error "Failed to install packages"; }
+apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat jq || \
+    { apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat jq || error "Failed to install packages"; }
 
 # Detect installed agent
 if systemctl list-unit-files 2>/dev/null | grep -q zabbix-agent2; then
