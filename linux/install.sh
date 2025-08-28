@@ -104,9 +104,13 @@ if systemctl list-unit-files 2>/dev/null | grep -q zabbix-agent2; then
 else
     AGENT_SERVICE="zabbix-agent"
     AGENT_CONFIG="/etc/zabbix/zabbix_agentd.conf"
-    CUSTOM_DIR="/etc/zabbix/zabbix_agentd.d"
+    CUSTOM_DIR="/etc/zabbix/zabbix_agentd.conf.d"
 fi
 success "Installed $AGENT_SERVICE"
+
+# Create config directory if it doesn't exist
+mkdir -p /etc/zabbix 2>/dev/null || true
+mkdir -p "$CUSTOM_DIR" 2>/dev/null || true
 
 # Configure sensors
 log "Configuring hardware sensors..."
@@ -175,8 +179,7 @@ Include=$CUSTOM_DIR/*.conf
 EOF
 fi
 
-# Create custom parameters directory
-mkdir -p "$CUSTOM_DIR"
+# Custom directory creation is already done above
 
 # Create streamlined custom parameters with consistent naming
 log "Creating custom monitoring parameters..."
