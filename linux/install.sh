@@ -62,6 +62,12 @@ cleanup_on_failure() {
 # Check root
 [[ $EUID -eq 0 ]] || error "This script must be run as root"
 
+# Kill any existing zabbix processes that might be using port 10050
+log "Checking for existing Zabbix processes..."
+pkill -f zabbix_agent 2>/dev/null || true
+pkill -f zabbix_agent2 2>/dev/null || true
+sleep 2  # Give processes time to terminate
+
 # Interactive hostname configuration
 if [ -z "${ZABBIX_HOSTNAME:-}" ]; then
     # Only ask interactively if running with a terminal
