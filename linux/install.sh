@@ -9,7 +9,6 @@ set -euo pipefail
 
 # Configuration
 ZABBIX_SERVER="${ZABBIX_SERVER:-192.168.70.2}"
-HOSTNAME="${HOSTNAME:-$(hostname)}"
 LOG_FILE="/var/log/zabbix/install.log"
 INSTALL_DIR="$(pwd)"
 
@@ -63,13 +62,29 @@ cleanup_on_failure() {
 # Check root
 [[ $EUID -eq 0 ]] || error "This script must be run as root"
 
+# Interactive hostname configuration
+if [ -z "${ZABBIX_HOSTNAME:-}" ]; then
+    # Only ask interactively if running with a terminal
+    if [ -t 0 ]; then
+        echo -e "\n${BLUE}=== Zabbix Agent Configuration ===${NC}"
+        echo -e "${BLUE}Enter hostname for this agent${NC} [default: $(hostname)]: "
+        read -r USER_HOSTNAME
+        HOSTNAME="${USER_HOSTNAME:-$(hostname)}"
+    else
+        HOSTNAME="$(hostname)"
+    fi
+else
+    HOSTNAME="$ZABBIX_HOSTNAME"
+fi
+
 # Create log directory
 mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
 
 log "=============================================="
 log " Rithm Zabbix Agent - Clean Install v5.0.0"
 log "=============================================="
-log "Server: $ZABBIX_SERVER | Host: $HOSTNAME"
+log "Server: $ZABBIX_SERVER"
+log "Hostname: $HOSTNAME (as configured in Zabbix)"
 
 # Detect system
 OS_VERSION=$(lsb_release -rs 2>/dev/null || echo "unknown")
