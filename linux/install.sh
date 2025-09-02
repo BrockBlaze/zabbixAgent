@@ -158,6 +158,22 @@ if ! timeout 120 apt-get update -qq; then
 fi
 success "Repository installed"
 
+# Wait for any existing package operations to complete
+log "Checking for existing package operations..."
+for i in {1..30}; do
+    if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+        break
+    fi
+    if [ $i -eq 1 ]; then
+        log "Waiting for existing package operations to complete..."
+    fi
+    sleep 10
+done
+
+if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+    error "Package manager is locked by another process. Please wait and retry."
+fi
+
 # Install packages
 log "Installing Zabbix agent and monitoring tools..."
 if ! timeout 300 apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat jq; then
