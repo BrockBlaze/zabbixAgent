@@ -12,6 +12,9 @@ ZABBIX_SERVER="${ZABBIX_SERVER:-192.168.70.2}"
 LOG_FILE="/var/log/zabbix/install.log"
 INSTALL_DIR="$(pwd)"
 
+# Create log directory early
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
