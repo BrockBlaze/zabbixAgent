@@ -195,7 +195,7 @@ fi
 
 # Configure sensors
 log "Configuring hardware sensors..."
-yes | sensors-detect >/dev/null 2>&1 || warning "Sensor configuration may have failed"
+timeout 60 bash -c 'yes | sensors-detect >/dev/null 2>&1' || warning "Sensor configuration may have failed"
 
 # Create main configuration
 log "Creating agent configuration..."
