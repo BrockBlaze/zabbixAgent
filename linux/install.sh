@@ -129,9 +129,23 @@ log "Ubuntu $OS_VERSION detected, using Zabbix $ZABBIX_VERSION"
 
 # Install repository
 log "Installing Zabbix repository..."
-wget -q -O /tmp/zabbix-release.deb \
-    "https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-4+ubuntu${REPO_VERSION}_all.deb" \
-    || error "Failed to download Zabbix repository"
+ZABBIX_REPO_URL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-4+ubuntu${REPO_VERSION}_all.deb"
+
+# Try downloading with retries
+for attempt in 1 2 3; do
+    log "Download attempt $attempt of 3..."
+    if wget --timeout=30 --tries=1 -q -O /tmp/zabbix-release.deb "$ZABBIX_REPO_URL"; then
+        log "Repository package downloaded successfully"
+        break
+    else
+        if [ $attempt -eq 3 ]; then
+            error "Failed to download Zabbix repository after 3 attempts"
+        else
+            warning "Download failed, retrying in 5 seconds..."
+            sleep 5
+        fi
+    fi
+done
 
 dpkg -i /tmp/zabbix-release.deb >/dev/null 2>&1
 apt-get update -qq || error "Failed to update package list"
