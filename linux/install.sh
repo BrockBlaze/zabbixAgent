@@ -147,14 +147,25 @@ for attempt in 1 2 3; do
     fi
 done
 
-dpkg -i /tmp/zabbix-release.deb >/dev/null 2>&1
-apt-get update -qq || error "Failed to update package list"
+log "Installing repository package..."
+if ! dpkg -i /tmp/zabbix-release.deb >/dev/null 2>&1; then
+    warning "Repository package install had issues, continuing..."
+fi
+
+log "Updating package lists..."
+if ! timeout 120 apt-get update -qq; then
+    error "Failed to update package list (timeout after 2 minutes)"
+fi
 success "Repository installed"
 
 # Install packages
 log "Installing Zabbix agent and monitoring tools..."
-apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat jq || \
-    { apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat jq || error "Failed to install packages"; }
+if ! timeout 300 apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat jq; then
+    log "Zabbix Agent 2 failed, trying Zabbix Agent 1..."
+    if ! timeout 300 apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat jq; then
+        error "Failed to install packages (timeout after 5 minutes)"
+    fi
+fi
 
 # Detect installed agent
 if systemctl list-unit-files 2>/dev/null | grep -q zabbix-agent2; then
