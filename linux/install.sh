@@ -67,9 +67,31 @@ cleanup_on_failure() {
 
 # Kill any existing zabbix processes that might be using port 10050
 log "Checking for existing Zabbix processes..."
+
+# Stop services first
+systemctl stop zabbix-agent2 2>/dev/null || true
+systemctl stop zabbix-agent 2>/dev/null || true
+sleep 2
+
+# Kill any remaining processes
 pkill -f zabbix_agent 2>/dev/null || true
 pkill -f zabbix_agent2 2>/dev/null || true
-sleep 2  # Give processes time to terminate
+sleep 2
+
+# Force kill anything still using port 10050
+PROCESS_ON_10050=$(lsof -ti:10050 2>/dev/null || true)
+if [ -n "$PROCESS_ON_10050" ]; then
+    log "Force killing process using port 10050: $PROCESS_ON_10050"
+    kill -9 $PROCESS_ON_10050 2>/dev/null || true
+    sleep 2
+fi
+
+# Verify port is free
+if lsof -ti:10050 >/dev/null 2>&1; then
+    error "Port 10050 is still in use after cleanup. Please reboot and retry."
+fi
+
+log "Port 10050 is now available"
 
 # Interactive hostname configuration
 if [ -z "${ZABBIX_HOSTNAME:-}" ]; then
