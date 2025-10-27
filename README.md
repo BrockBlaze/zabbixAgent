@@ -35,14 +35,13 @@ export ZABBIX_HOSTNAME=$(hostname)  # Default: system hostname
 ### 3. Run Installer
 
 ```bash
-sudo chmod +x linux/install.sh
-sudo ./linux/install.sh
+sudo bash linux/install.sh
 ```
 
-Or with custom server:
+Or with custom Zabbix server:
 
 ```bash
-sudo ZABBIX_SERVER=10.0.0.100 ./linux/install.sh
+sudo ZABBIX_SERVER=10.0.0.100 bash linux/install.sh
 ```
 
 ## What Gets Installed
