@@ -1,14 +1,22 @@
 #!/bin/bash
 
-# Rithm Zabbix Agent - Clean Installer
-# Version: 5.0.0 - Streamlined
-# Usage: curl -sSL [url]/install_clean.sh | sudo bash
-# Or: ssh user@server "curl -sSL [url]/install_clean.sh | sudo bash"
+# Rithm Zabbix Agent - Simplified Installer
+# Version: 6.0.0 - Ubuntu 20.04/24.04 + Proxmox Support
+# Usage:
+#   git clone https://github.com/BrockBlaze/zabbixAgent.git
+#   cd zabbixAgent
+#   sudo chmod +x linux/install.sh
+#   sudo ZABBIX_SERVER=192.168.70.2 ./linux/install.sh
+#
+# Environment Variables:
+#   ZABBIX_SERVER - IP address of Zabbix server (default: 192.168.70.2)
+#   ZABBIX_HOSTNAME - Hostname for this agent (default: system hostname)
 
 set -euo pipefail
 
 # Configuration
 ZABBIX_SERVER="${ZABBIX_SERVER:-192.168.70.2}"
+ZABBIX_HOSTNAME="${ZABBIX_HOSTNAME:-$(hostname)}"
 LOG_FILE="/var/log/zabbix/install.log"
 INSTALL_DIR="$(pwd)"
 
@@ -31,54 +39,45 @@ error() { echo -e "${RED}✗${NC} $1" | tee -a "$LOG_FILE"; cleanup_on_failure; 
 # Cleanup function for failed installations
 cleanup_on_failure() {
     log "Installation failed. Cleaning up..."
-    
-    # Stop and remove Zabbix services
+
     systemctl stop zabbix-agent2 2>/dev/null || true
     systemctl stop zabbix-agent 2>/dev/null || true
     systemctl disable zabbix-agent2 2>/dev/null || true
     systemctl disable zabbix-agent 2>/dev/null || true
-    
-    # Remove Zabbix packages
+
     apt-get remove --purge -y zabbix-agent2 zabbix-agent 2>/dev/null || true
     apt-get autoremove -y 2>/dev/null || true
-    
-    # Remove Zabbix repository
+
     rm -f /etc/apt/sources.list.d/zabbix.list 2>/dev/null || true
     apt-get update -qq 2>/dev/null || true
-    
-    # Remove configuration files and directories
+
     rm -rf /etc/zabbix/ 2>/dev/null || true
     rm -rf /var/log/zabbix/ 2>/dev/null || true
     rm -rf /var/run/zabbix/ 2>/dev/null || true
     rm -f /etc/sudoers.d/zabbix 2>/dev/null || true
-    
-    # Remove installation files if we're in a git clone
+
     if [[ "$INSTALL_DIR" == *"zabbixAgent"* ]] && [[ -d "$INSTALL_DIR/.git" ]]; then
         cd "$(dirname "$INSTALL_DIR")"
         rm -rf "$INSTALL_DIR" 2>/dev/null || true
         log "Removed git clone directory: $INSTALL_DIR"
     fi
-    
+
     log "Cleanup completed."
 }
 
 # Check root
 [[ $EUID -eq 0 ]] || error "This script must be run as root"
 
-# Kill any existing zabbix processes that might be using port 10050
+# Kill any existing zabbix processes using port 10050
 log "Checking for existing Zabbix processes..."
-
-# Stop services first
 systemctl stop zabbix-agent2 2>/dev/null || true
 systemctl stop zabbix-agent 2>/dev/null || true
 sleep 2
 
-# Kill any remaining processes
 pkill -f zabbix_agent 2>/dev/null || true
 pkill -f zabbix_agent2 2>/dev/null || true
 sleep 2
 
-# Force kill anything still using port 10050
 PROCESS_ON_10050=$(lsof -ti:10050 2>/dev/null || true)
 if [ -n "$PROCESS_ON_10050" ]; then
     log "Force killing process using port 10050: $PROCESS_ON_10050"
@@ -86,52 +85,49 @@ if [ -n "$PROCESS_ON_10050" ]; then
     sleep 2
 fi
 
-# Verify port is free
 if lsof -ti:10050 >/dev/null 2>&1; then
     error "Port 10050 is still in use after cleanup. Please reboot and retry."
 fi
 
 log "Port 10050 is now available"
 
-# Interactive hostname configuration
-if [ -z "${ZABBIX_HOSTNAME:-}" ]; then
-    # Only ask interactively if running with a terminal
-    if [ -t 0 ]; then
-        echo -e "\n${BLUE}=== Zabbix Agent Configuration ===${NC}"
-        echo -e "${BLUE}Enter hostname for this agent${NC} [default: $(hostname)]: "
-        read -r USER_HOSTNAME
-        HOSTNAME="${USER_HOSTNAME:-$(hostname)}"
-    else
-        HOSTNAME="$(hostname)"
-    fi
-else
-    HOSTNAME="$ZABBIX_HOSTNAME"
-fi
-
-# Create log directory
-mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
-
 log "=============================================="
-log " Rithm Zabbix Agent - Clean Install v5.0.0"
+log " Rithm Zabbix Agent Installer v6.0.0"
 log "=============================================="
 log "Server: $ZABBIX_SERVER"
-log "Hostname: $HOSTNAME (as configured in Zabbix)"
+log "Hostname: $ZABBIX_HOSTNAME"
 
-# Detect system
-OS_VERSION=$(lsb_release -rs 2>/dev/null || echo "unknown")
-case "$OS_VERSION" in
-    24.04) ZABBIX_VERSION="7.0"; REPO_VERSION="22.04" ;;
-    22.04) ZABBIX_VERSION="6.4"; REPO_VERSION="22.04" ;;
-    20.04) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04" ;;
-    *) ZABBIX_VERSION="6.0"; REPO_VERSION="22.04"; warning "Unknown Ubuntu version, using defaults" ;;
-esac
-log "Ubuntu $OS_VERSION detected, using Zabbix $ZABBIX_VERSION"
+# Detect OS and set Zabbix version
+IS_PROXMOX=false
+OS_NAME=""
+OS_VERSION=""
+
+if [ -f /etc/pve/.version ]; then
+    IS_PROXMOX=true
+    OS_NAME="Proxmox VE"
+    PVE_VERSION=$(cat /etc/pve/.version)
+    OS_VERSION=$(cat /etc/debian_version)
+    ZABBIX_VERSION="7.0"
+    REPO_VERSION="22.04"  # Proxmox 8.x is Debian 12 (bookworm), use Ubuntu 22.04 repo
+    log "Proxmox VE $PVE_VERSION detected (Debian $OS_VERSION), using Zabbix $ZABBIX_VERSION"
+elif [ -f /etc/lsb-release ]; then
+    OS_NAME="Ubuntu"
+    OS_VERSION=$(lsb_release -rs 2>/dev/null || echo "unknown")
+    case "$OS_VERSION" in
+        24.04) ZABBIX_VERSION="7.0"; REPO_VERSION="22.04" ;;
+        20.04) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04" ;;
+        22.04) ZABBIX_VERSION="6.4"; REPO_VERSION="22.04" ;;
+        *) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04"; warning "Unknown Ubuntu version, using defaults" ;;
+    esac
+    log "Ubuntu $OS_VERSION detected, using Zabbix $ZABBIX_VERSION"
+else
+    error "Unsupported OS. This installer supports Ubuntu 20.04, 24.04, and Proxmox VE only."
+fi
 
 # Install repository
 log "Installing Zabbix repository..."
 ZABBIX_REPO_URL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-4+ubuntu${REPO_VERSION}_all.deb"
 
-# Try downloading with retries
 for attempt in 1 2 3; do
     log "Download attempt $attempt of 3..."
     if wget --timeout=30 --tries=1 -q -O /tmp/zabbix-release.deb "$ZABBIX_REPO_URL"; then
@@ -158,7 +154,7 @@ if ! timeout 120 apt-get update -qq; then
 fi
 success "Repository installed"
 
-# Wait for any existing package operations to complete
+# Wait for any existing package operations
 log "Checking for existing package operations..."
 for i in {1..30}; do
     if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
@@ -174,11 +170,11 @@ if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
     error "Package manager is locked by another process. Please wait and retry."
 fi
 
-# Install packages
+# Install packages (including webapp performance monitoring tools)
 log "Installing Zabbix agent and monitoring tools..."
-if ! timeout 300 apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat jq; then
+if ! timeout 300 apt-get install -qq -y zabbix-agent2 lm-sensors smartmontools sysstat nvme-cli jq; then
     log "Zabbix Agent 2 failed, trying Zabbix Agent 1..."
-    if ! timeout 300 apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat jq; then
+    if ! timeout 300 apt-get install -qq -y zabbix-agent lm-sensors smartmontools sysstat nvme-cli jq; then
         error "Failed to install packages (timeout after 5 minutes)"
     fi
 fi
@@ -195,13 +191,12 @@ else
 fi
 success "Installed $AGENT_SERVICE"
 
-# Create necessary directories with proper permissions
+# Create necessary directories
 mkdir -p /etc/zabbix 2>/dev/null || true
 mkdir -p "$CUSTOM_DIR" 2>/dev/null || true
 mkdir -p /var/log/zabbix 2>/dev/null || true
 mkdir -p /var/run/zabbix 2>/dev/null || true
 
-# Set proper ownership for zabbix user
 if id "zabbix" &>/dev/null; then
     chown -R zabbix:zabbix /var/log/zabbix
     chown -R zabbix:zabbix /var/run/zabbix
@@ -215,18 +210,16 @@ timeout 60 bash -c 'yes | sensors-detect >/dev/null 2>&1' || warning "Sensor con
 
 # Create main configuration
 log "Creating agent configuration..."
-
-# Check if using agent2 or older agent for config compatibility
 if [[ "$AGENT_SERVICE" == "zabbix-agent2" ]]; then
-    # Agent2 configuration (supports AllowKey/DenyKey)
     cat > "$AGENT_CONFIG" << EOF
 # Rithm Zabbix Agent Configuration
 # Generated: $(date)
-# Host: $HOSTNAME
+# Host: $ZABBIX_HOSTNAME
+# Server: $ZABBIX_SERVER
 
 Server=$ZABBIX_SERVER
 ServerActive=$ZABBIX_SERVER:10051
-Hostname=$HOSTNAME
+Hostname=$ZABBIX_HOSTNAME
 
 # Performance
 Timeout=30
@@ -247,15 +240,15 @@ DenyKey=system.run[shutdown *]
 Include=$CUSTOM_DIR/*.conf
 EOF
 else
-    # Older agent configuration (doesn't support AllowKey/DenyKey)
     cat > "$AGENT_CONFIG" << EOF
 # Rithm Zabbix Agent Configuration
 # Generated: $(date)
-# Host: $HOSTNAME
+# Host: $ZABBIX_HOSTNAME
+# Server: $ZABBIX_SERVER
 
 Server=$ZABBIX_SERVER
 ServerActive=$ZABBIX_SERVER:10051
-Hostname=$HOSTNAME
+Hostname=$ZABBIX_HOSTNAME
 
 # Performance
 Timeout=30
@@ -267,7 +260,7 @@ LogFile=/var/log/zabbix/$(basename $AGENT_CONFIG .conf).log
 LogFileSize=10
 DebugLevel=3
 
-# Security - using older format
+# Security
 EnableRemoteCommands=1
 LogRemoteCommands=1
 
@@ -276,13 +269,11 @@ Include=$CUSTOM_DIR/*.conf
 EOF
 fi
 
-# Custom directory creation is already done above
-
-# Create streamlined custom parameters with consistent naming
+# Create enhanced custom parameters with webapp performance metrics
 log "Creating custom monitoring parameters..."
 cat > "$CUSTOM_DIR/rithm_custom.conf" << 'EOF'
-# Rithm Custom Parameters - Clean v5.0.0
-# All parameters use consistent custom.* naming
+# Rithm Custom Parameters v6.0.0
+# Focused on: CPU temp, NVME/SSD temp, Logins, Webapp Performance
 
 ### SYSTEM MONITORING ###
 UserParameter=custom.system.uptime,uptime | awk '{print $3}' | sed 's/,//'
@@ -295,38 +286,63 @@ UserParameter=custom.cpu.cores,nproc
 UserParameter=custom.cpu.load_1min,uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//'
 UserParameter=custom.cpu.load_5min,uptime | awk -F'load average:' '{print $2}' | awk '{print $2}' | sed 's/,//'
 
-### MEMORY MONITORING ###
+### MEMORY MONITORING (Critical for webapp performance) ###
 UserParameter=custom.memory.available,free -b | awk '/^Mem:/{print $7}'
 UserParameter=custom.memory.used_percent,free | awk '/^Mem:/{printf "%.2f", ($3/$2)*100}'
 UserParameter=custom.memory.swap_used,free -b | awk '/^Swap:/{print $3}'
+UserParameter=custom.memory.swap_used_percent,free | awk '/^Swap:/{if($2>0) printf "%.2f", ($3/$2)*100; else print 0}'
 
-### DISK MONITORING ###
+### DISK MONITORING (NVME/SSD Temperature + Performance) ###
 UserParameter=custom.disk.count,lsblk -d -o TYPE | grep -c disk
 UserParameter=custom.disk.root_usage,df / | awk 'NR==2{print $5}' | sed 's/%//'
-UserParameter=custom.disk.temperature[*],smartctl -A /dev/$1 2>/dev/null | grep Temperature_Celsius | awk '{print $10}' || echo 0
-UserParameter=custom.disk.smart_status[*],smartctl -H /dev/$1 2>/dev/null | grep -q "PASSED" && echo 1 || echo 0
-UserParameter=custom.disk.io_wait,iostat -x 1 1 | tail -n +4 | awk '{sum+=$10} END {printf "%.2f", sum/NR}' || echo 0
 
-### NETWORK MONITORING ###
+# Generic disk temperature (tries NVMe first, then SMART)
+UserParameter=custom.disk.temperature[*],nvme smart-log /dev/$1 2>/dev/null | grep "^temperature" | awk '{print $$3}' || smartctl -A /dev/$1 2>/dev/null | grep Temperature_Celsius | awk '{print $$10}' || echo 0
+
+# NVMe-specific temperature
+UserParameter=custom.disk.nvme_temp[*],nvme smart-log /dev/$1 2>/dev/null | grep "^temperature" | awk '{print $$3}' || echo 0
+
+# SMART health status (1=healthy, 0=failed)
+UserParameter=custom.disk.smart_status[*],smartctl -H /dev/$1 2>/dev/null | grep -q "PASSED" && echo 1 || echo 0
+
+# I/O wait percentage (CRITICAL for diagnosing slow webapps)
+UserParameter=custom.disk.io_wait,iostat -x 1 1 | tail -n +4 | awk '{sum+=$$4} END {printf "%.2f", sum/NR}' || echo 0
+
+# Disk read latency in milliseconds
+UserParameter=custom.disk.read_latency,iostat -x 1 2 | awk '/sd[a-z]|nvme/ {sum+=$$7} END {printf "%.2f", sum/NR}' || echo 0
+
+# Disk write latency in milliseconds
+UserParameter=custom.disk.write_latency,iostat -x 1 2 | awk '/sd[a-z]|nvme/ {sum+=$$11} END {printf "%.2f", sum/NR}' || echo 0
+
+# Disk read IOPS
+UserParameter=custom.disk.iops_read,iostat -x 1 2 | tail -n +7 | awk '{sum+=$$4} END {print int(sum)}' || echo 0
+
+# Disk write IOPS
+UserParameter=custom.disk.iops_write,iostat -x 1 2 | tail -n +7 | awk '{sum+=$$5} END {print int(sum)}' || echo 0
+
+### NETWORK MONITORING (Webapp connectivity) ###
 UserParameter=custom.network.connections_established,ss -tan | grep ESTABLISHED | wc -l
 UserParameter=custom.network.connections_listening,ss -tln | grep LISTEN | wc -l
 UserParameter=custom.network.connections_timewait,ss -tan | grep TIME-WAIT | wc -l
+
+# Network errors (packet drops)
+UserParameter=custom.network.errors,ip -s link | awk '/RX:/{getline; rx=$$3} /TX:/{getline; tx=$$3} END {print rx+tx}'
 
 ### SERVICE MONITORING ###
 UserParameter=custom.service.status[*],systemctl is-active $1 2>/dev/null || echo "inactive"
 UserParameter=custom.service.count_running,systemctl list-units --type=service --state=running --no-pager | grep -c "\.service"
 UserParameter=custom.service.count_failed,systemctl list-units --type=service --state=failed --no-pager | grep -c "\.service"
 
-### PROCESS MONITORING ###
-UserParameter=custom.process.top_cpu,ps aux | sort -nrk 3,3 | head -1 | awk '{print $2":"$3":"$11}'
-UserParameter=custom.process.top_memory,ps aux | sort -nrk 4,4 | head -1 | awk '{print $2":"$4":"$11}'
-UserParameter=custom.process.zombie_count,ps aux | awk '$8 ~ /^Z/ {count++} END {print count+0}'
+### PROCESS MONITORING (Webapp resource hogs) ###
+UserParameter=custom.process.top_cpu,ps aux | sort -nrk 3,3 | head -1 | awk '{print $$2":"$$3":"$$11}'
+UserParameter=custom.process.top_memory,ps aux | sort -nrk 4,4 | head -1 | awk '{print $$2":"$$4":"$$11}'
+UserParameter=custom.process.zombie_count,ps aux | awk '$$8 ~ /^Z/ {count++} END {print count+0}'
 UserParameter=custom.process.total_count,ps aux | wc -l
 
 ### LOGIN MONITORING ###
 UserParameter=custom.login.failed_last_hour,grep "authentication failure" /var/log/auth.log 2>/dev/null | grep "$(date --date='1 hour ago' '+%b %d %H')" | wc -l || echo 0
 UserParameter=custom.login.successful_last_hour,grep "Accepted" /var/log/auth.log 2>/dev/null | grep "$(date --date='1 hour ago' '+%b %d %H')" | wc -l || echo 0
-UserParameter=custom.login.last_user,last -n 1 | head -1 | awk '{print $1}' || echo "none"
+UserParameter=custom.login.last_user,last -n 1 | head -1 | awk '{print $$1}' || echo "none"
 UserParameter=custom.login.current_users,who | wc -l
 
 ### SECURITY MONITORING ###
@@ -346,7 +362,7 @@ UserParameter=custom.docker.images_count,docker images -q 2>/dev/null | wc -l ||
 
 ### DISCOVERY RULES ###
 UserParameter=custom.discovery.disks,lsblk -J -o NAME,TYPE | jq -c '.blockdevices | map(select(.type=="disk")) | map({"{#DISKNAME}": .name})'
-UserParameter=custom.discovery.services,systemctl list-unit-files --type=service --state=enabled --no-pager | tail -n +2 | head -n -2 | awk '{print $1}' | sed 's/.service$//' | jq -R -s -c 'split("\n")[:-1] | map({"{#SERVICE}": .})'
+UserParameter=custom.discovery.services,systemctl list-unit-files --type=service --state=enabled --no-pager | tail -n +2 | head -n -2 | awk '{print $$1}' | sed 's/.service$$//' | jq -R -s -c 'split("\n")[:-1] | map({"{#SERVICE}": .})'
 UserParameter=custom.discovery.network_interfaces,ip -j link show | jq -c '[.[] | select(.operstate == "UP" and .ifname != "lo") | {"{#INTERFACE}": .ifname}]'
 EOF
 
@@ -359,7 +375,7 @@ log "Configuring sudo permissions..."
 cat > /etc/sudoers.d/zabbix << 'EOF'
 # Zabbix monitoring permissions
 zabbix ALL=(ALL) NOPASSWD: /usr/bin/systemctl status *, /usr/bin/systemctl is-active *
-zabbix ALL=(ALL) NOPASSWD: /usr/sbin/smartctl, /usr/bin/sensors, /usr/bin/iostat
+zabbix ALL=(ALL) NOPASSWD: /usr/sbin/smartctl, /usr/bin/sensors, /usr/bin/iostat, /usr/sbin/nvme
 zabbix ALL=(ALL) NOPASSWD: /usr/bin/apt list, /usr/bin/docker ps, /usr/bin/docker images
 zabbix ALL=(ALL) NOPASSWD: /bin/grep, /bin/cat /var/log/*, /usr/bin/tail /var/log/*
 Defaults:zabbix !requiretty
@@ -376,16 +392,15 @@ systemctl enable "$AGENT_SERVICE"
 sleep 3
 if systemctl is-active --quiet "$AGENT_SERVICE"; then
     success "Agent is running ($AGENT_SERVICE)"
-    
-    # Test basic connectivity
+
     if command -v zabbix_get >/dev/null && timeout 5 zabbix_get -s localhost -k agent.ping 2>/dev/null | grep -q "1"; then
         success "Agent responds to ping"
     else
         warning "Agent ping test inconclusive (may need zabbix-get package)"
     fi
-    
-    # Test a few custom parameters
-    for metric in "custom.cpu.temperature" "custom.memory.available" "custom.disk.count"; do
+
+    # Test key metrics
+    for metric in "custom.cpu.temperature" "custom.memory.available" "custom.disk.count" "custom.disk.io_wait"; do
         if command -v zabbix_get >/dev/null; then
             result=$(timeout 3 zabbix_get -s localhost -k "$metric" 2>/dev/null || echo "test_failed")
             if [[ "$result" != "test_failed" && "$result" != "" ]]; then
@@ -405,47 +420,30 @@ fi
 log "=============================================="
 success "Rithm Zabbix Agent Installation Complete!"
 log "=============================================="
-log "Host: $HOSTNAME"
+log "OS: $OS_NAME $OS_VERSION"
+log "Hostname: $ZABBIX_HOSTNAME"
 log "Server: $ZABBIX_SERVER"
 log "Agent: $AGENT_SERVICE"
 log "Config: $AGENT_CONFIG"
 log "Custom Parameters: $CUSTOM_DIR/rithm_custom.conf"
 log ""
-log "Next steps:"
-log "1. Import the Rithm template to your Zabbix server"
-log "2. Add this host with hostname '$HOSTNAME'"
-log "3. Test from Zabbix server:"
-log "   zabbix_get -s $(hostname -I | awk '{print $1}') -k custom.cpu.temperature"
+log "📊 Monitoring Focus:"
+log "  • CPU Temperature"
+log "  • NVME/SSD Temperature & Health"
+log "  • Login Tracking"
+log "  • Webapp Performance Metrics:"
+log "    - I/O Wait (critical!)"
+log "    - Disk Latency"
+log "    - Memory/Swap Usage"
+log "    - Network Connections"
+log "    - Top Resource Consumers"
 log ""
-log "All custom parameters use 'custom.*' naming for consistency"
-
-# Generate template summary for admin
-cat > "/tmp/rithm_template_info_$(hostname).txt" << EOF
-Rithm Zabbix Template Information
-Generated: $(date)
-Hostname: $HOSTNAME
-IP: $(hostname -I | awk '{print $1}')
-
-Custom Parameters Available:
-- custom.system.* (uptime, kernel, reboot_required)
-- custom.cpu.* (temperature, cores, load_*)
-- custom.memory.* (available, used_percent, swap_used)
-- custom.disk.* (count, root_usage, temperature[*], smart_status[*])
-- custom.network.* (connections_*)
-- custom.service.* (status[*], count_*)
-- custom.process.* (top_*, zombie_count, total_count)
-- custom.login.* (failed_*, successful_*, last_user)
-- custom.security.* (updates_*, sudo_attempts)
-- custom.log.* (*_errors)
-- custom.docker.* (containers_*, images_count)
-
-Discovery Rules:
-- custom.discovery.disks
-- custom.discovery.services
-- custom.discovery.network_interfaces
-
-Template file will be generated separately.
-EOF
-
-log "Template information saved to: /tmp/rithm_template_info_$(hostname).txt"
+log "Next steps:"
+log "1. Import the Rithm template (zbx_export_templates.yaml) to your Zabbix server"
+log "2. Add this host with hostname '$ZABBIX_HOSTNAME' in Zabbix"
+log "3. Link the 'Rithm' template to the host"
+log "4. Test from Zabbix server:"
+log "   zabbix_get -s $(hostname -I | awk '{print $1}') -k custom.cpu.temperature"
+log "   zabbix_get -s $(hostname -I | awk '{print $1}') -k custom.disk.io_wait"
+log ""
 success "Installation completed successfully!"
