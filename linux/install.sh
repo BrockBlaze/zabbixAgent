@@ -101,6 +101,7 @@ log "Hostname: $ZABBIX_HOSTNAME"
 IS_PROXMOX=false
 OS_NAME=""
 OS_VERSION=""
+REPO_PACKAGE_VERSION=""
 
 if [ -f /etc/pve/.version ]; then
     IS_PROXMOX=true
@@ -108,16 +109,17 @@ if [ -f /etc/pve/.version ]; then
     PVE_VERSION=$(cat /etc/pve/.version)
     OS_VERSION=$(cat /etc/debian_version)
     ZABBIX_VERSION="7.0"
-    REPO_VERSION="22.04"  # Proxmox 8.x is Debian 12 (bookworm), use Ubuntu 22.04 repo
+    REPO_VERSION="22.04"
+    REPO_PACKAGE_VERSION="2"
     log "Proxmox VE $PVE_VERSION detected (Debian $OS_VERSION), using Zabbix $ZABBIX_VERSION"
 elif [ -f /etc/lsb-release ]; then
     OS_NAME="Ubuntu"
     OS_VERSION=$(lsb_release -rs 2>/dev/null || echo "unknown")
     case "$OS_VERSION" in
-        24.04) ZABBIX_VERSION="7.0"; REPO_VERSION="22.04" ;;
-        20.04) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04" ;;
-        22.04) ZABBIX_VERSION="6.4"; REPO_VERSION="22.04" ;;
-        *) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04"; warning "Unknown Ubuntu version, using defaults" ;;
+        24.04) ZABBIX_VERSION="7.0"; REPO_VERSION="24.04"; REPO_PACKAGE_VERSION="2" ;;
+        20.04) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04"; REPO_PACKAGE_VERSION="1" ;;
+        22.04) ZABBIX_VERSION="6.4"; REPO_VERSION="22.04"; REPO_PACKAGE_VERSION="1" ;;
+        *) ZABBIX_VERSION="6.0"; REPO_VERSION="20.04"; REPO_PACKAGE_VERSION="1"; warning "Unknown Ubuntu version, using defaults" ;;
     esac
     log "Ubuntu $OS_VERSION detected, using Zabbix $ZABBIX_VERSION"
 else
@@ -126,7 +128,7 @@ fi
 
 # Install repository
 log "Installing Zabbix repository..."
-ZABBIX_REPO_URL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-4+ubuntu${REPO_VERSION}_all.deb"
+ZABBIX_REPO_URL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/ubuntu/pool/main/z/zabbix-release/zabbix-release_${ZABBIX_VERSION}-${REPO_PACKAGE_VERSION}+ubuntu${REPO_VERSION}_all.deb"
 
 for attempt in 1 2 3; do
     log "Download attempt $attempt of 3..."
